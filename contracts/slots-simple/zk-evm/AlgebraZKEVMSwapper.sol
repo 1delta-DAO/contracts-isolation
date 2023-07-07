@@ -30,6 +30,8 @@ abstract contract AlgebraZKEVMSwapper is VIXTokenHolder {
     uint128 internal AMOUNT_CACHED = type(uint128).max;
     uint128 internal constant DEFAULT_AMOUNT_CACHED = type(uint128).max;
 
+    address public immutable DATA_PROVIDER;
+
     /// @dev MIN_SQRT_RATIO + 1 from Uniswap's TickMath
     uint160 internal immutable MIN_SQRT_RATIO = 4295128740;
     /// @dev MAX_SQRT_RATIO - 1 from Uniswap's TickMath
@@ -50,7 +52,9 @@ abstract contract AlgebraZKEVMSwapper is VIXTokenHolder {
     // owner
     address public OWNER;
 
-    constructor() {}
+    constructor(address _dataProvider) {
+        DATA_PROVIDER = _dataProvider;
+    }
 
     function skipToken(bytes memory path) internal pure returns (bytes memory) {
         return path.slice(21, path.length - 21);
