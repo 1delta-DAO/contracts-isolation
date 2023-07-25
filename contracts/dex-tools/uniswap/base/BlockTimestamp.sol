@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.20;
+pragma solidity 0.8.21;
 
 /// @title Function for getting block timestamp
 /// @dev Base contract that is overridden for tests

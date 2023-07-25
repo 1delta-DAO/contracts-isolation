@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.20;
+pragma solidity 0.8.21;
 
 /// @title Optimized overflow and underflow safe math operations
 /// @notice Contains methods for doing math operations that revert on overflow or underflow for minimal gas cost

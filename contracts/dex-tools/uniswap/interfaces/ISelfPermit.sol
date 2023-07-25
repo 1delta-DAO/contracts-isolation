@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.20;
+pragma solidity 0.8.21;
 
 /// @title Self Permit
 /// @notice Functionality to call permit on any EIP-2612-compliant token for use in the route

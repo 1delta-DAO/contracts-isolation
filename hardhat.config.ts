@@ -330,7 +330,7 @@ const config: HardhatUserConfig = {
         },
       },
       {
-        version: '0.8.20',
+        version: '0.8.21',
         settings: {
           optimizer: {
             enabled: true,
@@ -394,7 +394,7 @@ const config: HardhatUserConfig = {
         },
       },
       "contracts/CompoundSlot.sol": {
-        version: '0.8.20',
+        version: '0.8.21',
         settings: {
           optimizer: {
             enabled: true,
@@ -404,7 +404,7 @@ const config: HardhatUserConfig = {
         },
       },
       "contracts/CompoundSlotFactory.sol": {
-        version: '0.8.20',
+        version: '0.8.21',
         settings: {
           optimizer: {
             enabled: true,
@@ -414,7 +414,7 @@ const config: HardhatUserConfig = {
         },
       },
       "contracts/AggregationSlotFactory.sol": {
-        version: '0.8.20',
+        version: '0.8.21',
         settings: {
           optimizer: {
             enabled: true,
@@ -424,7 +424,7 @@ const config: HardhatUserConfig = {
         },
       },
       "contracts/AggregationSlot.sol": {
-        version: '0.8.20',
+        version: '0.8.21',
         settings: {
           optimizer: {
             enabled: true,
@@ -454,7 +454,7 @@ const config: HardhatUserConfig = {
         },
       },
       "contracts/external-protocols/compound/Comptroller.sol": {
-        version: "0.8.20",
+        version: "0.8.21",
         settings: {
           evmVersion: 'london',
           optimizer: {
@@ -467,7 +467,7 @@ const config: HardhatUserConfig = {
         },
       },
       "contracts/external-protocols/compound/ComptrollerG7.sol": {
-        version: "0.8.20",
+        version: "0.8.21",
         settings: {
           evmVersion: 'london',
           optimizer: {
@@ -480,7 +480,7 @@ const config: HardhatUserConfig = {
         },
       },
       "contracts/external-protocols/compound/test/ComptrollerHarness.sol": {
-        version: "0.8.20",
+        version: "0.8.21",
         settings: {
           evmVersion: 'london',
           optimizer: {
@@ -493,7 +493,7 @@ const config: HardhatUserConfig = {
         },
       },
       "contracts/external-protocols/compound/test/ComptrollerScenario.sol": {
-        version: "0.8.20",
+        version: "0.8.21",
         settings: {
           evmVersion: 'london',
           optimizer: {
@@ -506,7 +506,7 @@ const config: HardhatUserConfig = {
         },
       },
       "contracts/external-protocols/compound/test/CErc20Harness.sol": {
-        version: "0.8.20",
+        version: "0.8.21",
         settings: {
           evmVersion: 'london',
           optimizer: {

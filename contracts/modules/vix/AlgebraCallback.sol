@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.21;
 
 import {IUniswapV3Pool} from "../../external-protocols/uniswapV3/core/interfaces/IUniswapV3Pool.sol";
 import {BytesLib} from "../../dex-tools/uniswap/libraries/BytesLib.sol";

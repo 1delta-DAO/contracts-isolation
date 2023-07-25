@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.20;
+pragma solidity 0.8.21;
 
 /// @title Interface for verifying contract-based account signatures
 /// @notice Interface that verifies provided signature for the data

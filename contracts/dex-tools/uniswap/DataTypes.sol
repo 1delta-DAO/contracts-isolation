@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.20;
+pragma solidity 0.8.21;
 
 // Collection of data sets to be en- and de-coded for uniswapV3 callbacks
 

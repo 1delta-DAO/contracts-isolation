@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.21;
 
 import "../../external-protocols/openzeppelin/access/Ownable.sol";
 import {ICompoundTypeCERC20, ICompoundTypeCEther, IComptroller} from "../zk-evm/CompoundTypeInterfaces.sol";
