@@ -11,7 +11,6 @@ pragma solidity ^0.8.20;
 import "./external-protocols/openzeppelin/utils/cryptography/ECDSA.sol";
 import "./external-protocols/openzeppelin/proxy/utils/Initializable.sol";
 import "./external-protocols/openzeppelin/proxy/utils/UUPSUpgradeable.sol";
-import "./abstract-account/BaseAccount.sol";
 import "./utils/AaveHandler.sol";
 import "./utils/tokens/AaveTokens.sol";
 import "./utils/SignatureValidator.sol";
@@ -23,28 +22,18 @@ import {INativeWrapper} from "./interfaces/INativeWrapper.sol";
  *  has execute, eth handling methods
  *  has a single signer that can send requests through the entryPoint.
  */
-contract AaveSlot is BaseAccount, UUPSUpgradeable, Initializable, AaveHandler, AaveTokenHolder, SignatureValidator {
+contract AaveSlot is UUPSUpgradeable, Initializable, AaveHandler, AaveTokenHolder, SignatureValidator {
     using ECDSA for bytes32;
-
-    IEntryPoint private immutable _entryPoint;
-
-    event SimpleAccountInitialized(IEntryPoint indexed entryPoint, address indexed owner);
 
     modifier onlyOwner() {
         _onlyOwner();
         _;
     }
 
-    /// @inheritdoc BaseAccount
-    function entryPoint() public view virtual override returns (IEntryPoint) {
-        return _entryPoint;
-    }
-
     // solhint-disable-next-line no-empty-blocks
     receive() external payable {}
 
     constructor(
-        IEntryPoint anEntryPoint,
         address[] memory _tokens,
         address[] memory _aTokens,
         address[] memory _vTokens,
@@ -58,7 +47,6 @@ contract AaveSlot is BaseAccount, UUPSUpgradeable, Initializable, AaveHandler, A
         AaveHandler(_aavePool, _wrappedNative, _1inchRouter)
         AaveTokenHolder(_tokens, _aTokens, _vTokens, _sTokens, _aavePool, _numTokens)
     {
-        _entryPoint = anEntryPoint;
         _disableInitializers();
     }
 
@@ -286,18 +274,6 @@ contract AaveSlot is BaseAccount, UUPSUpgradeable, Initializable, AaveHandler, A
             callData,
             0
         );
-    }
-
-    // Require the function call went through EntryPoint or owner
-    function _requireFromEntryPointOrOwner() internal view {
-        require(msg.sender == address(entryPoint()) || msg.sender == OWNER, "account: not Owner or EntryPoint");
-    }
-
-    /// implement template method of BaseAccount
-    function _validateSignature(UserOperation calldata userOp, bytes32 userOpHash) internal virtual override returns (uint256 validationData) {
-        bytes32 hash = userOpHash.toEthSignedMessageHash();
-        if (OWNER != hash.recover(userOp.signature)) return SIG_VALIDATION_FAILED;
-        return 0;
     }
 
     function _authorizeUpgrade(address newImplementation) internal view override {

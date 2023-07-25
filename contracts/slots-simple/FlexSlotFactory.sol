@@ -8,7 +8,7 @@ import "../external-protocols/openzeppelin/utils/Create2.sol";
 import "../external-protocols/openzeppelin/proxy/ERC1967/ERC1967Proxy.sol";
 import "../external-protocols/openzeppelin/token/ERC20/IERC20.sol";
 import "../external-protocols/openzeppelin/utils/structs/EnumerableSet.sol";
-import "./1DeltaFlexProxy.sol";
+import "../proxies/1DeltaFlexProxy.sol";
 import "./ISlot.sol";
 import "../interfaces/compound/ICompoundTypeCERC20.sol";
 import "../interfaces/compound/IComptroller.sol";

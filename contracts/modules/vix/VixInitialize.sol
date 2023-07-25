@@ -5,8 +5,13 @@ pragma solidity ^0.8.20;
 /* solhint-disable no-inline-assembly */
 /* solhint-disable max-line-length */
 
-import "./AlgebraZKEVMSwapper.sol";
 import {IERC20Permit} from "../../external-protocols/openzeppelin/token/ERC20/extensions/IERC20Permit.sol";
+import {IERC20} from "../../external-protocols/openzeppelin/token/ERC20/IERC20.sol";
+import {BaseSwapper} from "./BaseSwapper.sol";
+import {ICompoundTypeCEther, ICompoundTypeCERC20, IDataProvider} from "./data-provider/IDataProvider.sol";
+import {INativeWrapper} from "../../interfaces/INativeWrapper.sol";
+import {WithVixStorage, VixDetailsStorage} from "./VixStorage.sol";
+import {SafeCast} from "../../dex-tools/uniswap/libraries/SafeCast.sol";
 
 struct InitParams {
     // deposit amounts
@@ -45,43 +50,37 @@ struct InitParamsWithPermit {
     PermitParams permit;
 }
 
-/**
- *  Slot contract that holds Compound V2 style balances on behalf of users.
- */
-contract DeltaSlot is AlgebraZKEVMSwapper {
+contract VixInitialize is WithVixStorage, BaseSwapper {
     using SafeCast for uint256;
 
     error Slippage();
     error AlreadyInitialized();
 
     address private immutable FACTORY;
+    address private immutable NATIVE_WRAPPER;
+    address private immutable DATA_PROVIDER;
+    uint256 private constant DEFAULT_AMOUNT_CACHED = type(uint256).max;
 
-    // one slot
-    uint112 private collateralSwapped;
-    uint112 private debtSwapped;
-    uint32 private closeTime;
-
-    // one slot
-    uint32 private creationTime;
-    uint24 private constant FEE_DENOMINATOR = 0; // = no fees
-    uint8 private _initialized;
-
-    // solhint-disable-next-line no-empty-blocks
-    receive() external payable {}
-
-    constructor(address _factory, address _dataProvider) AlgebraZKEVMSwapper(_dataProvider) {
+    constructor(
+        address _factory,
+        address _dataProvider,
+        address _weth
+    ) BaseSwapper(_factory) {
         FACTORY = _factory;
+        DATA_PROVIDER = _dataProvider;
+        NATIVE_WRAPPER = _weth;
     }
 
     /**
      * @dev Initializes with ERC20 deposit - can swap to WETH
      */
     function initialize(address owner, InitParams calldata params) external payable virtual {
-        if (_initialized != 0) revert AlreadyInitialized();
-        _initialized = 1;
+        VixDetailsStorage memory details = ds();
+        if (details.initialized != 0) revert AlreadyInitialized();
+        details.initialized = 1;
         bytes memory _bytes = params.swapPath;
         address _tokenCollateral;
-        creationTime = uint32(block.timestamp % 2**32);
+        details.creationTime = uint32(block.timestamp % 2**32);
         // fetch token and flag for more data
         assembly {
             _tokenCollateral := div(mload(add(add(_bytes, 0x20), 0)), 0x1000000000000000000000000)
@@ -125,19 +124,18 @@ contract DeltaSlot is AlgebraZKEVMSwapper {
             // deposit collateral
             ICompoundTypeCERC20(cTokenCollateral).mint(_deposited);
         }
-        COLLATERAL = _tokenCollateral;
-
+        gs().collateral = _tokenCollateral;
         // configure collateral
         address[] memory collateralArray = new address[](1);
         collateralArray[0] = cTokenCollateral;
         IDataProvider(DATA_PROVIDER).getComptroller().enterMarkets(collateralArray);
         // set owner
-        OWNER = owner;
+        ads().owner = owner;
         uint128 borrowAmount = params.borrowAmount;
-        debtSwapped = uint112(borrowAmount);
+        details.debtSwapped = uint112(borrowAmount);
         // margin swap
         uint128 _received = _openPosition(borrowAmount, params.marginPath);
-        collateralSwapped = uint112(_received);
+        details.collateralSwapped = uint112(_received);
         if (_received < params.minimumMarginReceived) revert Slippage();
     }
 
@@ -145,12 +143,13 @@ contract DeltaSlot is AlgebraZKEVMSwapper {
      * @dev initialize with ETH deposit
      */
     function initializeETH(address owner, InitParams calldata params) external payable virtual {
-        if (_initialized != 0) revert AlreadyInitialized();
-        _initialized = 1;
+        VixDetailsStorage memory details = ds();
+        if (details.initialized != 0) revert AlreadyInitialized();
+        details.initialized = 1;
 
         bytes memory _bytes = params.swapPath;
         address _tokenCollateral;
-        creationTime = uint32(block.timestamp % 2**32);
+        details.creationTime = uint32(block.timestamp % 2**32);
 
         // fetch token and flag for more data
         assembly {
@@ -182,7 +181,7 @@ contract DeltaSlot is AlgebraZKEVMSwapper {
         }
 
         // set collateral
-        COLLATERAL = _tokenCollateral;
+        gs().collateral = _tokenCollateral;
 
         // configure collateral
         address[] memory collateralArray = new address[](1);
@@ -190,12 +189,12 @@ contract DeltaSlot is AlgebraZKEVMSwapper {
         IDataProvider(DATA_PROVIDER).getComptroller().enterMarkets(collateralArray);
 
         // set owner
-        OWNER = owner;
+        ads().owner = owner;
         uint128 borrowAmount = params.borrowAmount;
-        debtSwapped = uint112(borrowAmount);
+        details.debtSwapped = uint112(borrowAmount);
         // margin swap
         uint128 _received = _openPosition(borrowAmount, params.marginPath);
-        collateralSwapped = uint112(_received);
+        details.collateralSwapped = uint112(_received);
         if (_received < params.minimumMarginReceived) revert Slippage();
     }
 
@@ -209,11 +208,11 @@ contract DeltaSlot is AlgebraZKEVMSwapper {
         bytes memory path
     ) public payable virtual returns (uint256 amountIn) {
         // efficient OnlyOwner() check
-        address owner = OWNER;
+        address owner = ads().owner;
         require(msg.sender == owner, "OnlyOwner()");
 
         address tokenIn; // the token that shares a pool with borrow
-        address tokenOut = BORROW; // token out MUST be borrow token
+        address tokenOut = gs().debt; // token out MUST be borrow token
         address native = NATIVE_WRAPPER;
         assembly {
             tokenIn := div(mload(add(add(path, 0x20), 21)), 0x1000000000000000000000000)
@@ -222,21 +221,22 @@ contract DeltaSlot is AlgebraZKEVMSwapper {
         bool partFlag = amountToRepay != 0;
         uint256 amountOut = partFlag
             ? amountToRepay
-            : ICompoundTypeCERC20(tokenOut == native ? IDataProvider(DATA_PROVIDER).cEther() : IDataProvider(DATA_PROVIDER).cToken(tokenOut)).borrowBalanceCurrent(address(this));
+            : ICompoundTypeCERC20(tokenOut == native ? IDataProvider(DATA_PROVIDER).cEther() : IDataProvider(DATA_PROVIDER).cToken(tokenOut))
+                .borrowBalanceCurrent(address(this));
         bool zeroForOne = tokenIn < tokenOut;
         _toPool(tokenIn, tokenOut).swap(address(this), zeroForOne, -amountOut.toInt256(), zeroForOne ? MIN_SQRT_RATIO : MAX_SQRT_RATIO, path);
 
         // fetch amount in and clean cache
-        amountIn = AMOUNT_CACHED;
-        AMOUNT_CACHED = DEFAULT_AMOUNT_CACHED;
+        amountIn = cs().amount;
+        cs().amount = DEFAULT_AMOUNT_CACHED;
         if (amountInMaximum < amountIn) revert Slippage();
 
         // when everything is repaid, the amount is withdrawn to the owner
         if (!partFlag) {
             uint256 withdrawAmount;
-            uint256 fee = FEE_DENOMINATOR;
-            address collateral = COLLATERAL;
-            closeTime = uint32(block.timestamp % 2**32);
+            uint256 fee = 0;
+            address collateral = gs().collateral;
+            ds().closeTime = uint32(block.timestamp % 2**32);
             if (collateral == native) {
                 withdrawAmount = address(this).balance;
                 if (fee != 0) {
@@ -266,12 +266,13 @@ contract DeltaSlot is AlgebraZKEVMSwapper {
      * @dev Allows creation of position with permit (e.g. DAI, USDC etc.)
      */
     function initializeWithPermit(InitParamsWithPermit calldata params) external payable virtual {
-        if (_initialized != 0) revert AlreadyInitialized();
-        _initialized = 1;
+        VixDetailsStorage memory details = ds();
+        if (details.initialized != 0) revert AlreadyInitialized();
+        details.initialized = 1;
 
         bytes memory _bytes = params.swapPath;
         address _tokenCollateral;
-        creationTime = uint32(block.timestamp % 2**32);
+        details.creationTime = uint32(block.timestamp % 2**32);
 
         // fetch token and flag for more data
         assembly {
@@ -304,7 +305,7 @@ contract DeltaSlot is AlgebraZKEVMSwapper {
             if (_deposited < params.minimumAmountDeposited) revert Slippage();
         }
         // assign collateral
-        COLLATERAL = _tokenCollateral;
+        gs().collateral = _tokenCollateral;
         address cTokenCollateral = IDataProvider(DATA_PROVIDER).cToken(_tokenCollateral);
         // capprove deposit token (can also be the collateral token)
         IERC20(_tokenCollateral).approve(cTokenCollateral, _deposited);
@@ -318,109 +319,35 @@ contract DeltaSlot is AlgebraZKEVMSwapper {
         ICompoundTypeCERC20(cTokenCollateral).mint(_deposited);
 
         // set owner
-        OWNER = owner;
+        ads().owner = owner;
         uint128 borrowAmount = params.borrowAmount;
-        debtSwapped = uint112(borrowAmount);
+        details.debtSwapped = uint112(borrowAmount);
         // margin swap
         uint128 _received = _openPosition(borrowAmount, params.marginPath);
-        collateralSwapped = uint112(_received);
+        details.collateralSwapped = uint112(_received);
         if (_received < params.minimumMarginReceived) revert Slippage();
     }
 
-    /**
-     * Allows users to repay some debt of the position.
-     * Can also be done by any other party to the benefit of the user.
-     */
-    function repay(uint256 amount) external payable {
-        address debt = BORROW;
-        uint256 _amount = amount;
-        if (debt == NATIVE_WRAPPER) {
-            _amount = msg.value;
-            ICompoundTypeCEther(IDataProvider(DATA_PROVIDER).cEther()).repayBorrow{value: _amount}();
-        } else {
-            address _cToken = IDataProvider(DATA_PROVIDER).cToken(debt);
-            // approve
-            IERC20(debt).transferFrom(msg.sender, address(this), _amount);
-            IERC20(debt).approve(_cToken, _amount);
-            // repay
-            ICompoundTypeCERC20(_cToken).repayBorrow(_amount);
+    function _openPosition(uint128 amountIn, bytes memory path) internal returns (uint128 amountOut) {
+        address tokenIn;
+        address tokenOut;
+
+        assembly {
+            tokenIn := div(mload(add(add(path, 0x20), 0)), 0x1000000000000000000000000)
+            tokenOut := div(mload(add(add(path, 0x20), 21)), 0x1000000000000000000000000)
         }
-    }
 
-    /**
-     * Allows users to withdraw directly from the position. Only the user cna withdraw.
-     * Fees have to be paid to the factory.
-     */
-    function withdraw(uint256 amount, bool useCTokens) external payable {
-        // efficient OnlyOwner() check
-        address owner = OWNER;
-        require(msg.sender == owner, "OnlyOwner()");
+        bool zeroForOne = tokenIn < tokenOut;
+        _toPool(tokenIn, tokenOut).swap(address(this), zeroForOne, uint256(amountIn).toInt256(), zeroForOne ? MIN_SQRT_RATIO : MAX_SQRT_RATIO, path);
 
-        address collateral = COLLATERAL;
-        uint256 _amount = amount;
-        uint256 fee = FEE_DENOMINATOR;
-        if (collateral == NATIVE_WRAPPER) {
-            if (useCTokens) {
-                ICompoundTypeCEther(IDataProvider(DATA_PROVIDER).cEther()).redeem(_amount);
-                _amount = address(this).balance;
-                if (fee != 0) {
-                    fee = _amount / fee;
-                    _amount -= fee;
-                    // transfer all ether in this contract
-                    payable(owner).transfer(_amount);
-                    payable(FACTORY).transfer(fee);
-                } else {
-                    // transfer all ether in this contract
-                    payable(owner).transfer(_amount);
-                }
-            } else {
-                ICompoundTypeCEther(IDataProvider(DATA_PROVIDER).cEther()).redeemUnderlying(_amount);
-                if (fee != 0) {
-                    fee = _amount / fee;
-                    _amount -= fee;
-                    // transfer selected amount
-                    payable(owner).transfer(_amount);
-                    payable(FACTORY).transfer(fee);
-                } else {
-                    // transfer selected amount
-                    payable(owner).transfer(_amount);
-                }
-            }
-        } else {
-            address _cToken = IDataProvider(DATA_PROVIDER).cToken(collateral);
-
-            if (useCTokens) {
-                ICompoundTypeCERC20(_cToken).redeem(_amount);
-                _amount = IERC20(collateral).balanceOf(address(this));
-                if (fee != 0) {
-                    fee = _amount / fee;
-                    _amount -= fee;
-                    // here we transfer the full balance
-                    IERC20(collateral).transfer(owner, _amount);
-                    IERC20(collateral).transfer(FACTORY, fee);
-                } else {
-                    IERC20(collateral).transfer(owner, _amount);
-                }
-            } else {
-                ICompoundTypeCERC20(_cToken).redeemUnderlying(_amount);
-                if (fee != 0) {
-                    fee = _amount / fee;
-                    _amount -= fee;
-                    // transfer the user selected amount
-                    IERC20(collateral).transfer(owner, _amount);
-                    IERC20(collateral).transfer(FACTORY, fee);
-                } else {
-                    // transfer the user selected amount
-                    IERC20(collateral).transfer(owner, _amount);
-                }
-            }
-        }
+        amountOut = uint128(cs().amount);
+        cs().amount = DEFAULT_AMOUNT_CACHED;
     }
 
     function getCTokens() external view returns (address cTokenCollateral, address cTokenBorrow) {
         address wrapper = NATIVE_WRAPPER;
-        address debt = BORROW;
-        address collateral = COLLATERAL;
+        address debt = gs().debt;
+        address collateral = gs().collateral;
         if (debt == wrapper) return (IDataProvider(DATA_PROVIDER).cToken(collateral), IDataProvider(DATA_PROVIDER).cEther());
 
         if (collateral == wrapper) return (IDataProvider(DATA_PROVIDER).cEther(), IDataProvider(DATA_PROVIDER).cToken(debt));
@@ -429,7 +356,7 @@ contract DeltaSlot is AlgebraZKEVMSwapper {
     }
 
     function getOpenAmounts() external view returns (uint256, uint256) {
-        return (collateralSwapped, debtSwapped);
+        return (ds().collateralSwapped, ds().debtSwapped);
     }
 
     function getFactoryData()
@@ -442,6 +369,6 @@ contract DeltaSlot is AlgebraZKEVMSwapper {
             uint64
         )
     {
-        return (FACTORY, FEE_DENOMINATOR, creationTime, closeTime);
+        return (FACTORY, 0, ds().creationTime, ds().closeTime);
     }
 }

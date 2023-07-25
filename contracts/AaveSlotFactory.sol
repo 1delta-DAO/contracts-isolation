@@ -7,7 +7,7 @@ pragma solidity ^0.8.20;
 import "./external-protocols/openzeppelin/utils/Create2.sol";
 import "./external-protocols/openzeppelin/proxy/ERC1967/ERC1967Proxy.sol";
 import "./external-protocols/openzeppelin/utils/structs/EnumerableSet.sol";
-import "./utils/1DeltaProxy.sol";
+import "./proxies/1DeltaProxy.sol";
 import "./AaveSlot.sol";
 
 /**
@@ -22,7 +22,6 @@ contract AaveSlotFactory {
     uint256 public currentId;
 
     constructor(
-        IEntryPoint _entryPoint,
         address[] memory _tokens,
         address[] memory _aTokens,
         address[] memory _vTokens,
@@ -32,7 +31,7 @@ contract AaveSlotFactory {
         address _1inchRouter,
         uint256 _numTokens
     ) {
-        accountImplementation = new AaveSlot(_entryPoint, _tokens, _aTokens, _vTokens, _sTokens, _aavePool, _wrappedNative, _1inchRouter, _numTokens);
+        accountImplementation = new AaveSlot( _tokens, _aTokens, _vTokens, _sTokens, _aavePool, _wrappedNative, _1inchRouter, _numTokens);
     }
 
     /**

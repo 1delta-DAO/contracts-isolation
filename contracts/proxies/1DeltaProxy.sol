@@ -3,7 +3,7 @@
 pragma solidity ^0.8.20;
 
 import "../external-protocols/openzeppelin/proxy/Proxy.sol";
-import "./proxy/MinimalERC1967Upgrade.sol";
+import "./utils/MinimalERC1967Upgrade.sol";
 
 /**
  * @dev This contract implements an upgradeable proxy. It is upgradeable because calls are delegated to an

@@ -3,6 +3,8 @@ import { BigNumber } from "ethers";
 import { ethers } from "hardhat"
 import {
   CErc20Harness,
+  CErc20HarnessNoReturn,
+  CErc20HarnessNoReturn__factory,
   CErc20Harness__factory,
   CEther,
   CEtherHarness__factory,
@@ -38,7 +40,7 @@ export function etherMantissa(num: number | BigNumber, scale: number | BigNumber
 
 
 export interface CompoundFixture {
-  cTokens: CErc20Harness[]
+  cTokens: (CErc20Harness | CErc20HarnessNoReturn)[]
   underlyings: (ERC20Mock | FiatWithPermit)[]
   cEther: CEther
   comptroller: ComptrollerHarness
@@ -61,7 +63,7 @@ export interface CompoundOptions {
 
 }
 
-export async function generateCompoundFixture(signer: SignerWithAddress, options: CompoundOptions): Promise<CompoundFixture> {
+export async function generateCompoundFixture(signer: SignerWithAddress, options: CompoundOptions, vix = false): Promise<CompoundFixture> {
 
   // deploy unitroller
   const unitroller = await new Unitroller__factory(signer).deploy()
@@ -113,14 +115,14 @@ export async function generateCompoundFixture(signer: SignerWithAddress, options
   await comptroller.harnessAddCompMarkets([cEther.address]);
   await comptroller._setCollateralFactor(cEther.address, options.ethCollateralFactor ?? ONE_18.mul(7).div(10))
 
-  let cTokens: CErc20Harness[] = [], interestRateModels: InterestRateModelHarness[] = [];
+  let cTokens: (CErc20Harness| CErc20HarnessNoReturn)[] = [], interestRateModels: InterestRateModelHarness[] = [];
   for (let i = 0; i < options.underlyings.length; i++) {
     const interestRateModel = await new InterestRateModelHarness__factory(signer).deploy(options.borrowRates[i])
     const decimals = 18;
     const symbol = 'OMG' + i;
     const name = `Erc20 ${i}`;
     const underlying = options.underlyings[i]
-    const cerc20Token = await new CErc20Harness__factory(signer).deploy(
+    const cerc20Token = await new ( vix? CErc20HarnessNoReturn__factory: CErc20Harness__factory)(signer).deploy(
       underlying.address,
       comptroller.address,
       interestRateModel.address,

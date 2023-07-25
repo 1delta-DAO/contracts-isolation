@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.20;
 
-import {ICompoundTypeCERC20, ICompoundTypeCEther, IComptroller} from "../zk-evm/CompoundTypeInterfaces.sol";
+import {ICompoundTypeCERC20, ICompoundTypeCEther, IComptroller} from "./CompoundTypeInterfaces.sol";
 
 interface IDataProvider {
     function cToken(address _underlying) external view returns (address token);

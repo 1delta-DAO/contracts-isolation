@@ -2,8 +2,8 @@
 
 pragma solidity ^0.8.20;
 
-import "../../external-protocols/openzeppelin/access/Ownable.sol";
-import {ICompoundTypeCERC20, ICompoundTypeCEther, IComptroller} from "../zk-evm/CompoundTypeInterfaces.sol";
+import "../../../external-protocols/openzeppelin/access/Ownable.sol";
+import {ICompoundTypeCERC20, ICompoundTypeCEther, IComptroller} from "./CompoundTypeInterfaces.sol";
 
 contract DataProvider is Ownable {
     // events

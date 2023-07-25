@@ -10,7 +10,10 @@ import {PoolAddressCalculator} from "../../dex-tools/uniswap/libraries/PoolAddre
 import {DexData} from "../../utils/base/DexData.sol";
 import {INativeWrapper} from "../../interfaces/INativeWrapper.sol";
 import {IERC20} from "../../external-protocols/openzeppelin/token/ERC20/IERC20.sol";
-import {ICompoundTypeCEther, ICompoundTypeCERC20, IDataProvider} from "../data-provider/IDataProvider.sol";
+import {ICompoundTypeCEther, ICompoundTypeCERC20, IDataProvider} from "./data-provider/IDataProvider.sol";
+import {TokenTransfer} from "../../utils/TokenTransfer.sol";
+import {WithVixStorage} from "./VixStorage.sol";
+import {BaseSwapper} from "./BaseSwapper.sol";
 
 // solhint-disable max-line-length
 
@@ -19,71 +22,25 @@ import {ICompoundTypeCEther, ICompoundTypeCERC20, IDataProvider} from "../data-p
  * @notice Allows users to build large margins positions with one contract interaction
  * @author Achthar
  */
-abstract contract AlgebraZKEVMSwapper {
+contract AlgebraCallback is BaseSwapper, TokenTransfer, WithVixStorage {
     error Callback();
 
     using BytesLib for bytes;
     using SafeCast for uint256;
 
-    uint128 internal AMOUNT_CACHED = type(uint128).max;
-    uint128 internal constant DEFAULT_AMOUNT_CACHED = type(uint128).max;
+    uint256 internal constant DEFAULT_AMOUNT_CACHED = type(uint256).max;
 
     address public immutable DATA_PROVIDER;
 
-    /// @dev MIN_SQRT_RATIO + 1 from Uniswap's TickMath
-    uint160 internal immutable MIN_SQRT_RATIO = 4295128740;
-    /// @dev MAX_SQRT_RATIO - 1 from Uniswap's TickMath
-    uint160 internal immutable MAX_SQRT_RATIO = 1461446703485210103287273052203988822378723970341;
+    address internal immutable NATIVE_WRAPPER;
 
-    /// @dev Mask of lower 20 bytes.
-    uint256 private constant ADDRESS_MASK = 0x00ffffffffffffffffffffffffffffffffffffffff;
-
-    // pair config
-    address public COLLATERAL;
-    address public BORROW;
-    address internal constant NATIVE_WRAPPER = 0x4F9A0e7FD2Bf6067db6994CF12E4495Df938E6e9;
-
-    // the used address is the algebra pool deployer
-    bytes32 private constant ALG_FF_FACTORY_ADDRESS = 0xff0d500b1d8e8ef31e21c99d1db9a6444d3adf12700000000000000000000000;
-    // bytes32((uint256(0xff) << 248) | (uint256(uint160(0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270)) << 88));
-    bytes32 private constant POOL_CODE_HASH = 0x6ec6c9c8091d160c0aa74b2b14ba9c1717e95093bd3ac085cee99a49aab294a4;
-    // owner
-    address public OWNER;
-
-    constructor(address _dataProvider) {
+    constructor(
+        address _factory,
+        address _dataProvider,
+        address _weth
+    ) BaseSwapper(_factory) {
         DATA_PROVIDER = _dataProvider;
-    }
-
-    function skipToken(bytes memory path) internal pure returns (bytes memory) {
-        return path.slice(21, path.length - 21);
-    }
-
-    function getFirstPool(bytes memory path) internal pure returns (bytes memory) {
-        return path.slice(0, 41);
-    }
-
-    // Compute the pool address given two tokens and a fee.
-    function _toPool(address inputToken, address outputToken) internal pure returns (IUniswapV3Pool pool) {
-        // address(keccak256(abi.encodePacked(
-        //     hex"ff",
-        //     UNI_FACTORY_ADDRESS,
-        //     keccak256(abi.encode(inputToken, outputToken, fee)),
-        //     UNI_POOL_INIT_CODE_HASH
-        // )))
-        (address token0, address token1) = inputToken < outputToken ? (inputToken, outputToken) : (outputToken, inputToken);
-        assembly {
-            let s := mload(0x40)
-            let p := s
-            mstore(p, ALG_FF_FACTORY_ADDRESS)
-            p := add(p, 21)
-            // Compute the inner hash in-place
-            mstore(p, token0)
-            mstore(add(p, 32), token1)
-            mstore(p, keccak256(p, 64))
-            p := add(p, 32)
-            mstore(p, POOL_CODE_HASH) // pool code hash zkEvm
-            pool := and(ADDRESS_MASK, keccak256(s, 85))
-        }
+        NATIVE_WRAPPER = _weth;
     }
 
     function algebraSwapCallback(
@@ -109,7 +66,7 @@ abstract contract AlgebraZKEVMSwapper {
         // SWAP EXACT IN
         if (tradeType == 3) {
             uint256 amountToPay = amount0Delta > 0 ? uint256(amount0Delta) : uint256(amount1Delta);
-            IERC20(tokenIn).transfer(msg.sender, amountToPay);
+            _transferERC20Tokens(tokenIn, msg.sender, amountToPay);
         }
         // OPEN EXACT IN
         else if (tradeType == 0) {
@@ -123,9 +80,9 @@ abstract contract AlgebraZKEVMSwapper {
                 amountToSupply = exactInputToSelf(amountToSupply, data);
             }
             // cache amount
-            AMOUNT_CACHED = uint128(amountToSupply);
-            BORROW = tokenIn;
-            tokenOut = COLLATERAL; // lock out to collateral
+            cs().amount = uint128(amountToSupply);
+            gs().debt = tokenIn;
+            tokenOut = gs().collateral; // lock out to collateral
             address native = NATIVE_WRAPPER;
             // debt is ETH
             if (native == tokenIn) {
@@ -138,7 +95,7 @@ abstract contract AlgebraZKEVMSwapper {
                 // deposit ETH for wETH
                 INativeWrapper(tokenIn).deposit{value: amountToBorrow}();
                 // transfer WETH
-                IERC20(tokenIn).transfer(msg.sender, amountToBorrow);
+                _transferERC20Tokens(tokenIn, msg.sender, amountToBorrow);
             } else {
                 // collateral in ETH
                 if (native == tokenOut) {
@@ -151,7 +108,7 @@ abstract contract AlgebraZKEVMSwapper {
                     // borrow regular ERC20
                     ICompoundTypeCERC20(tokenOut).borrow(amountToBorrow);
                     // transfer ERC20
-                    IERC20(tokenIn).transfer(msg.sender, amountToBorrow);
+                    _transferERC20Tokens(tokenIn, msg.sender, amountToBorrow);
                 } else {
                     // only ERC20
                     address _cToken = IDataProvider(DATA_PROVIDER).cToken(tokenOut);
@@ -163,7 +120,7 @@ abstract contract AlgebraZKEVMSwapper {
                     // borrow regular ERC20
                     ICompoundTypeCERC20(_cToken).borrow(amountToBorrow);
                     // transfer ERC20
-                    IERC20(tokenIn).transfer(msg.sender, amountToBorrow);
+                    _transferERC20Tokens(tokenIn, msg.sender, amountToBorrow);
                 }
             }
         }
@@ -208,7 +165,7 @@ abstract contract AlgebraZKEVMSwapper {
             }
             // if it's a single swap, we just withdraw and repay the swap pool
             else {
-                AMOUNT_CACHED = uint128(amountToWithdraw);
+                cs().amount = uint128(amountToWithdraw);
                 // tradeType now indicates whethr it is partial repay or full
                 assembly {
                     tradeType := mload(add(add(data, 0x1), 42)) // will only be used in last hop
@@ -287,54 +244,7 @@ abstract contract AlgebraZKEVMSwapper {
                 }
             }
             // cache amount
-            AMOUNT_CACHED = uint128(amountToPay);
+            cs().amount = uint128(amountToPay);
         }
-    }
-
-    function exactInputToSelf(uint256 amountIn, bytes memory data) internal returns (uint256 amountOut) {
-        while (true) {
-            bytes memory exactInputData = getFirstPool(data);
-            address tokenIn;
-            bool multiPool = data.length > 42;
-            address tokenOut;
-            assembly {
-                tokenIn := div(mload(add(add(exactInputData, 0x20), 0)), 0x1000000000000000000000000)
-                tokenOut := div(mload(add(add(exactInputData, 0x20), 21)), 0x1000000000000000000000000)
-            }
-            bool zeroForOne = tokenIn < tokenOut;
-            (int256 amount0, int256 amount1) = _toPool(tokenIn, tokenOut).swap(
-                address(this),
-                zeroForOne,
-                amountIn.toInt256(),
-                zeroForOne ? MIN_SQRT_RATIO : MAX_SQRT_RATIO,
-                exactInputData
-            );
-
-            amountIn = uint256(-(zeroForOne ? amount1 : amount0));
-
-            // decide whether to continue or terminate
-            if (multiPool) {
-                data = skipToken(data);
-            } else {
-                amountOut = amountIn;
-                break;
-            }
-        }
-    }
-
-    function _openPosition(uint128 amountIn, bytes memory path) internal returns (uint128 amountOut) {
-        address tokenIn;
-        address tokenOut;
-
-        assembly {
-            tokenIn := div(mload(add(add(path, 0x20), 0)), 0x1000000000000000000000000)
-            tokenOut := div(mload(add(add(path, 0x20), 21)), 0x1000000000000000000000000)
-        }
-
-        bool zeroForOne = tokenIn < tokenOut;
-        _toPool(tokenIn, tokenOut).swap(address(this), zeroForOne, uint256(amountIn).toInt256(), zeroForOne ? MIN_SQRT_RATIO : MAX_SQRT_RATIO, path);
-
-        amountOut = AMOUNT_CACHED;
-        AMOUNT_CACHED = DEFAULT_AMOUNT_CACHED;
     }
 }

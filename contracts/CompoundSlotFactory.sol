@@ -7,7 +7,7 @@ pragma solidity ^0.8.20;
 import "./external-protocols/openzeppelin/utils/Create2.sol";
 import "./external-protocols/openzeppelin/proxy/ERC1967/ERC1967Proxy.sol";
 import "./external-protocols/openzeppelin/utils/structs/EnumerableSet.sol";
-import "./utils/1DeltaProxy.sol";
+import "./proxies/1DeltaProxy.sol";
 import "./CompoundSlot.sol";
 
 /**
