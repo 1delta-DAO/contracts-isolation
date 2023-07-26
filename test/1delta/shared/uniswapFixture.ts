@@ -190,8 +190,13 @@ export async function addUniswapLiquidity(
 
     const tB = await new ethers.Contract(tokenAddressB, IERC20__factory.createInterface(), signer)
     await tB.connect(signer).approve(uniswap.nft.address, constants.MaxUint256)
+    const poolA = await uniswap.factory.getPool(
+        liquidityParams.token0,
+         liquidityParams.token1,
+         FeeAmount.MEDIUM
+         )
 
-    console.log("add liquidity", tokenAddressA, tokenAddressB)
+    console.log("Pool", poolA)
 
     return uniswap.nft.connect(signer).mint(liquidityParams)
 }

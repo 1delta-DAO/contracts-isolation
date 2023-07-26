@@ -139,7 +139,7 @@ export async function addAlgebraLiquidity(
   const tB = await new ethers.Contract(tokenAddressB, IERC20__factory.createInterface(), signer)
   await tB.connect(signer).approve(algebra.nft.address, constants.MaxUint256)
 
-  // console.log("add liquidity", tokenAddressA, tokenAddressB)
+  console.log("Pool", pool.address)
 
   return algebra.nft.connect(signer).mint(liquidityParams)
 }

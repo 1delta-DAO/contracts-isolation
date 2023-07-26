@@ -2,7 +2,26 @@ import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 import { ethers, network, waffle } from 'hardhat'
 import { expect } from './shared/expect'
 import { CompoundFixture, CompoundOptions, generateCompoundFixture, ONE_18 } from './shared/compoundFixture'
-import { Slot__factory, ERC20Mock__factory, OVixLensZK__factory, OVixLensZK, Slot, FiatWithPermit, DeltaModuleProvider, DeltaModuleProvider__factory, VixSlotFactory, SlotFactoryProxy__factory, VixSlotFactory__factory, AlgebraCallback__factory, DataProvider, DataProvider__factory, VixInitialize, VixInitialize__factory, VixDirect, VixDirect__factory, VixInitializeAggregator, AggregatorCallback, AggregatorCallback__factory, VixInitializeAggregator__factory } from '../../types';
+import {
+    Slot__factory,
+    ERC20Mock__factory,
+    OVixLensZK__factory,
+    OVixLensZK,
+    FiatWithPermit,
+    DeltaModuleProvider,
+    DeltaModuleProvider__factory,
+    VixSlotFactory,
+    SlotFactoryProxy__factory,
+    VixSlotFactory__factory,
+    DataProvider,
+    DataProvider__factory,
+    VixDirect,
+    VixDirect__factory,
+    VixInitializeAggregator,
+    AggregatorCallback,
+    AggregatorCallback__factory,
+    VixInitializeAggregator__factory
+} from '../../types';
 import { BigNumber, constants } from 'ethers';
 import { expandTo18Decimals } from '../uniswap-v3/core/shared/utilities';
 import { feedCompound, feedCompoundETH } from './shared/misc';
@@ -60,7 +79,6 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
             closeFactor: ONE_18
         }
         dataProvider = await new DataProvider__factory(deployer).deploy()
-
 
         await tokenData.wnative.connect(deployer).deposit({ value: expandTo18Decimals(1_500) })
         // approve & fund wallets
@@ -537,14 +555,14 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
         const path = encodeAlgebraPathEthers(
             _tokensInRoute,
             [FeeAmount.MEDIUM, FeeAmount.ALGEBRA, FeeAmount.MEDIUM],
-            [0, 3, 3], 
+            [0, 3, 3],
             0
-            )
+        )
 
         let _tokensInRouteSwapIn = routeIndexesSwapIn.map(t => compoundFixture.underlyings[t].address)
         const swapPath = encodeAlgebraPathEthers(
             _tokensInRouteSwapIn,
-            [FeeAmount.MEDIUM ,FeeAmount.ALGEBRA],
+            [FeeAmount.MEDIUM, FeeAmount.ALGEBRA],
             [3, 3], 0)
 
         const params = {
