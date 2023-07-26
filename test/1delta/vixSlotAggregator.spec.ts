@@ -13,6 +13,7 @@ import { tokenFixture, TokenFixture } from './shared/tokensFixture';
 import { MockProvider } from 'ethereum-waffle';
 import { produceSig } from './shared/permitUtils';
 import { getSelectors, ModuleConfigAction } from './helpers/diamond';
+import { addUniswapLiquidity, UniswapMinimalFixtureNoTokens } from './shared/uniswapFixture';
 
 const approve = async (signer: SignerWithAddress, token: string, spender: string) => {
     const tokenConttract = await new ERC20Mock__factory(signer).attach(token)
@@ -24,10 +25,11 @@ const toNumber = (n: BigNumber | string) => {
 }
 
 // Tests all configurations for the minimal slot variant
-describe('Diamond Slot trading via data provider', async () => {
+describe('Diamond Slot aggregation trading via data provider', async () => {
     let deployer: SignerWithAddress, alice: SignerWithAddress, bob: SignerWithAddress, carol: SignerWithAddress;
     let compoundFixture: CompoundFixture
     let opts: CompoundOptions
+    let uniswap: UniswapMinimalFixtureNoTokens
     let algebra: AlgebraFixture
     let tokenData: TokenFixture
     let provider: MockProvider
@@ -97,8 +99,6 @@ describe('Diamond Slot trading via data provider', async () => {
         await dataProvider.setOEther(compoundFixture.cEther.address)
 
         lens = await new OVixLensZK__factory(deployer).deploy()
-
-        // MODULES
 
         moduleProvider = await new DeltaModuleProvider__factory(deployer).deploy()
 
@@ -211,6 +211,55 @@ describe('Diamond Slot trading via data provider', async () => {
             algebra
         )
 
+        console.log("add WETH 0")
+        await addUniswapLiquidity(
+            deployer,
+            tokenData.wnative.address,
+            tokenData.tokens[0].address,
+            expandTo18Decimals(100),
+            expandTo18Decimals(100),
+            uniswap
+        )
+
+        console.log("add 0 1")
+        await addUniswapLiquidity(
+            deployer,
+            tokenData.tokens[0].address,
+            tokenData.tokens[1].address,
+            expandTo18Decimals(1_000_000),
+            expandTo18Decimals(1_000_000),
+            uniswap
+        )
+
+        console.log("add 1 2")
+        await addUniswapLiquidity(
+            deployer,
+            tokenData.tokens[1].address,
+            tokenData.tokens[2].address,
+            expandTo18Decimals(1_000_000),
+            expandTo18Decimals(1_000_000),
+            uniswap
+        )
+
+        console.log("add 2 3")
+        await addUniswapLiquidity(
+            deployer,
+            tokenData.tokens[2].address,
+            tokenData.tokens[3].address,
+            expandTo18Decimals(1_000_000),
+            expandTo18Decimals(1_000_000),
+            uniswap
+        )
+
+        console.log("add 3 4")
+        await addUniswapLiquidity(
+            deployer,
+            tokenData.tokens[3].address,
+            tokenData.tokens[4].address,
+            expandTo18Decimals(1_000_000),
+            expandTo18Decimals(1_000_000),
+            uniswap
+        )
 
     })
 

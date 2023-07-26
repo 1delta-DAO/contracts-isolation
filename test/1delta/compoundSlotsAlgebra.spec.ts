@@ -24,7 +24,6 @@ describe('Compound Slot Trading', async () => {
     let algebra: AlgebraFixture
     let tokenData: TokenFixture
     let compoundSlotFactory: AggregationSlotFactory
-    let minimalRouter: MinimalSwapRouter
 
     before('get wallets and fixture', async () => {
         [deployer, alice, bob, carol] = await ethers.getSigners();
@@ -32,7 +31,6 @@ describe('Compound Slot Trading', async () => {
         tokenData = await tokenFixture(deployer, 6)
         algebra = await algebraFixture(deployer, tokenData.wnative.address)
         uniswap = await uniswapMinimalFixtureNoTokens(deployer, tokenData.wnative.address)
-        minimalRouter = await new MinimalSwapRouter__factory(deployer).deploy(uniswap.factory.address, tokenData.wnative.address)
 
         opts = {
             underlyings: tokenData.tokens,
