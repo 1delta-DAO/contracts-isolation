@@ -13,7 +13,7 @@ import {SafeCast} from "../../dex-tools/uniswap/libraries/SafeCast.sol";
  * @notice Allows users to build large margins positions with one contract interaction
  * @author Achthar
  */
-abstract contract BaseSwapper {
+abstract contract BaseAggregator {
     using BytesLib for bytes;
     using SafeCast for uint256;
 
