@@ -2,9 +2,9 @@
 
 pragma solidity ^0.8.21;
 
-import {IUniswapV3Pool} from "../../external-protocols/uniswapV3/core/interfaces/IUniswapV3Pool.sol";
-import {BytesLib} from "../../dex-tools/uniswap/libraries/BytesLib.sol";
-import {SafeCast} from "../../dex-tools/uniswap/libraries/SafeCast.sol";
+import {IUniswapV3Pool} from "../../../external-protocols/uniswapV3/core/interfaces/IUniswapV3Pool.sol";
+import {BytesLib} from "../../../dex-tools/uniswap/libraries/BytesLib.sol";
+import {SafeCast} from "../../../dex-tools/uniswap/libraries/SafeCast.sol";
 
 // solhint-disable max-line-length
 

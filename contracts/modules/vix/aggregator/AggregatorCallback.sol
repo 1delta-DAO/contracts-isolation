@@ -2,18 +2,18 @@
 
 pragma solidity ^0.8.21;
 
-import {IUniswapV3Pool} from "../../external-protocols/uniswapV3/core/interfaces/IUniswapV3Pool.sol";
-import {BytesLib} from "../../dex-tools/uniswap/libraries/BytesLib.sol";
-import {SafeCast} from "../../dex-tools/uniswap/libraries/SafeCast.sol";
-import {TransferHelper} from "../../dex-tools/uniswap/libraries/TransferHelper.sol";
-import {PoolAddressCalculator} from "../../dex-tools/uniswap/libraries/PoolAddressCalculator.sol";
-import {DexData} from "../../utils/base/DexData.sol";
-import {INativeWrapper} from "../../interfaces/INativeWrapper.sol";
-import {IERC20} from "../../external-protocols/openzeppelin/token/ERC20/IERC20.sol";
-import {ICompoundTypeCEther, ICompoundTypeCERC20, IDataProvider} from "./data-provider/IDataProvider.sol";
-import {TokenTransfer} from "../../utils/TokenTransfer.sol";
-import {WithVixStorage} from "./VixStorage.sol";
-import {BaseSwapper} from "./BaseSwapper.sol";
+import {IUniswapV3Pool} from "../../../external-protocols/uniswapV3/core/interfaces/IUniswapV3Pool.sol";
+import {BytesLib} from "../../../dex-tools/uniswap/libraries/BytesLib.sol";
+import {SafeCast} from "../../../dex-tools/uniswap/libraries/SafeCast.sol";
+import {TransferHelper} from "../../../dex-tools/uniswap/libraries/TransferHelper.sol";
+import {PoolAddressCalculator} from "../../../dex-tools/uniswap/libraries/PoolAddressCalculator.sol";
+import {DexData} from "../../../utils/base/DexData.sol";
+import {INativeWrapper} from "../../../interfaces/INativeWrapper.sol";
+import {IERC20} from "../../../external-protocols/openzeppelin/token/ERC20/IERC20.sol";
+import {ICompoundTypeCEther, ICompoundTypeCERC20, IDataProvider} from "../data-provider/IDataProvider.sol";
+import {TokenTransfer} from "../../../utils/TokenTransfer.sol";
+import {WithVixStorage} from "../VixStorage.sol";
+import {BaseAggregator} from "./BaseAggregator.sol";
 
 // solhint-disable max-line-length
 
@@ -22,7 +22,7 @@ import {BaseSwapper} from "./BaseSwapper.sol";
  * @notice Allows users to build large margins positions with one contract interaction
  * @author Achthar
  */
-contract AlgebraCallback is BaseSwapper, TokenTransfer, WithVixStorage {
+contract AggregatorCAllback is BaseAggregator, TokenTransfer, WithVixStorage {
     error Callback();
 
     using BytesLib for bytes;
@@ -35,10 +35,11 @@ contract AlgebraCallback is BaseSwapper, TokenTransfer, WithVixStorage {
     address internal immutable NATIVE_WRAPPER;
 
     constructor(
-        address _factory,
+        address _algebraDeployer,
+        address _doveFactory,
         address _dataProvider,
         address _weth
-    ) BaseSwapper(_factory) {
+    ) BaseAggregator(_algebraDeployer, _doveFactory) {
         DATA_PROVIDER = _dataProvider;
         NATIVE_WRAPPER = _weth;
     }
@@ -53,27 +54,27 @@ contract AlgebraCallback is BaseSwapper, TokenTransfer, WithVixStorage {
         uint8 tradeType;
         address tokenIn;
         address tokenOut;
-        // fetches tokens and trade typefrom path
+        uint24 fee;
         assembly {
             tokenIn := div(mload(add(add(data, 0x20), 0)), 0x1000000000000000000000000)
-            tradeType := mload(add(add(data, 0x1), 20))
-            tokenOut := div(mload(add(add(data, 0x20), 21)), 0x1000000000000000000000000)
+            fee := mload(add(add(data, 0x3), 20))
+            tradeType := mload(add(add(data, 0x1), 23))
+            tokenOut := div(mload(add(add(data, 0x20), 24)), 0x1000000000000000000000000)
         }
-        // validates that callback came from pool
         {
-            if (msg.sender != address(_toPool(tokenIn, tokenOut))) revert Callback();
+            require(msg.sender == address(_toPool(tokenIn, fee, tokenOut)), "Inavlid Callback");
         }
-        // SWAP EXACT IN
+        // regular exact input
         if (tradeType == 3) {
             uint256 amountToPay = amount0Delta > 0 ? uint256(amount0Delta) : uint256(amount1Delta);
-            _transferERC20Tokens(tokenIn, msg.sender, amountToPay);
+            IERC20(tokenIn).transfer(msg.sender, amountToPay);
         }
         // OPEN EXACT IN
         else if (tradeType == 0) {
             (uint256 amountToBorrow, uint256 amountToSupply) = amount0Delta > 0
                 ? (uint256(amount0Delta), uint256(-amount1Delta))
                 : (uint256(amount1Delta), uint256(-amount0Delta));
-            if (data.length > 42) {
+            if (data.length > 68) {
                 // we need to swap to the token that we want to supply
                 // the router returns the amount that we can finally supply to the protocol
                 data = skipToken(data);
@@ -145,17 +146,19 @@ contract AlgebraCallback is BaseSwapper, TokenTransfer, WithVixStorage {
             }
             // multi pool means that we have to nest swaps and then withdraw and
             // repay the swap pool
-            if (data.length > 42) {
+            if (data.length > 68) {
                 // we then swap exact In where the first amount is
                 // withdrawn from the lending protocol pool and paid back to the pool
                 data = skipToken(data);
 
                 assembly {
                     tokenOut := div(mload(add(add(data, 0x20), 0)), 0x1000000000000000000000000)
-                    tokenIn := div(mload(add(add(data, 0x20), 21)), 0x1000000000000000000000000)
+                    fee := mload(add(add(data, 0x3), 20))
+                    tokenIn := div(mload(add(add(data, 0x20), 24)), 0x1000000000000000000000000)
                 }
+
                 bool zeroForOne = tokenIn < tokenOut;
-                _toPool(tokenIn, tokenOut).swap(
+                _toPool(tokenIn, fee, tokenOut).swap(
                     msg.sender,
                     zeroForOne,
                     -amountToWithdraw.toInt256(),
@@ -168,7 +171,7 @@ contract AlgebraCallback is BaseSwapper, TokenTransfer, WithVixStorage {
                 cs().amount = uint128(amountToWithdraw);
                 // tradeType now indicates whethr it is partial repay or full
                 assembly {
-                    tradeType := mload(add(add(data, 0x1), 42)) // will only be used in last hop
+                    tradeType := mload(add(add(data, 0x1), 68)) // will only be used in last hop
                 }
 
                 if (tokenOut == NATIVE_WRAPPER) {
@@ -201,21 +204,28 @@ contract AlgebraCallback is BaseSwapper, TokenTransfer, WithVixStorage {
             // multi swap exact out
             uint256 amountToPay = amount0Delta > 0 ? uint256(amount0Delta) : uint256(amount1Delta);
             // if more pools are provided, we continue the swap
-            if (data.length > 42) {
+            if (data.length > 68) {
                 data = skipToken(data);
                 // decode first pool, out first, then in
                 assembly {
                     tokenOut := div(mload(add(add(data, 0x20), 0)), 0x1000000000000000000000000)
-                    tokenIn := div(mload(add(add(data, 0x20), 21)), 0x1000000000000000000000000)
+                    fee := mload(add(add(data, 0x3), 20))
+                    tokenIn := div(mload(add(add(data, 0x20), 24)), 0x1000000000000000000000000)
                 }
 
                 bool zeroForOne = tokenIn < tokenOut;
 
-                _toPool(tokenIn, tokenOut).swap(msg.sender, zeroForOne, -amountToPay.toInt256(), zeroForOne ? MIN_SQRT_RATIO : MAX_SQRT_RATIO, data);
+                _toPool(tokenIn, fee, tokenOut).swap(
+                    msg.sender,
+                    zeroForOne,
+                    -amountToPay.toInt256(),
+                    zeroForOne ? MIN_SQRT_RATIO : MAX_SQRT_RATIO,
+                    data
+                );
             } else {
                 // tradeType now indicates whethr it is partial repay or full
                 assembly {
-                    tradeType := mload(add(add(data, 0x1), 42)) // will only be used in last hop
+                    tradeType := mload(add(add(data, 0x1), 68)) // will only be used in last hop
                 }
                 // withraw and send funds to the pool
                 if (tokenOut == NATIVE_WRAPPER) {
