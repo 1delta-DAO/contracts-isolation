@@ -50,7 +50,7 @@ struct InitParamsWithPermit {
     PermitParams permit;
 }
 
-contract VixInitialize is WithVixStorage, BaseAggregator {
+contract VixInitializeAggregator is WithVixStorage, BaseAggregator {
     using SafeCast for uint256;
 
     error Slippage();
@@ -227,8 +227,15 @@ contract VixInitialize is WithVixStorage, BaseAggregator {
             ? amountToRepay
             : ICompoundTypeCERC20(tokenOut == native ? IDataProvider(DATA_PROVIDER).cEther() : IDataProvider(DATA_PROVIDER).cToken(tokenOut))
                 .borrowBalanceCurrent(address(this));
+        
         bool zeroForOne = tokenIn < tokenOut;
-        _toPool(tokenIn, fee, tokenOut).swap(address(this), zeroForOne, -amountOut.toInt256(), zeroForOne ? MIN_SQRT_RATIO : MAX_SQRT_RATIO, path);
+        _toPool(tokenIn, fee, tokenOut).swap(
+            address(this),
+            zeroForOne,
+            -amountOut.toInt256(),
+            zeroForOne ? MIN_SQRT_RATIO : MAX_SQRT_RATIO, 
+            path
+            );
 
         // fetch amount in and clean cache
         amountIn = cs().amount;

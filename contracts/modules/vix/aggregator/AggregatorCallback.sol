@@ -14,6 +14,7 @@ import {ICompoundTypeCEther, ICompoundTypeCERC20, IDataProvider} from "../data-p
 import {TokenTransfer} from "../../../utils/TokenTransfer.sol";
 import {WithVixStorage} from "../VixStorage.sol";
 import {BaseAggregator} from "./BaseAggregator.sol";
+import "hardhat/console.sol";
 
 // solhint-disable max-line-length
 
@@ -22,7 +23,7 @@ import {BaseAggregator} from "./BaseAggregator.sol";
  * @notice Allows users to build large margins positions with one contract interaction
  * @author Achthar
  */
-contract AggregatorCAllback is BaseAggregator, TokenTransfer, WithVixStorage {
+contract AggregatorCallback is BaseAggregator, TokenTransfer, WithVixStorage {
     error Callback();
 
     using BytesLib for bytes;
@@ -49,6 +50,22 @@ contract AggregatorCAllback is BaseAggregator, TokenTransfer, WithVixStorage {
         int256 amount1Delta,
         bytes calldata _data
     ) external {
+        _swapCallback(amount0Delta, amount1Delta, _data);
+    }
+
+    function uniswapV3SwapCallback(
+        int256 amount0Delta,
+        int256 amount1Delta,
+        bytes calldata _data
+    ) external {
+        _swapCallback(amount0Delta, amount1Delta, _data);
+    }
+
+    function _swapCallback(
+        int256 amount0Delta,
+        int256 amount1Delta,
+        bytes calldata _data
+    ) private {
         // create datacopy to memory
         bytes memory data = _data;
         uint8 tradeType;
@@ -225,7 +242,7 @@ contract AggregatorCAllback is BaseAggregator, TokenTransfer, WithVixStorage {
             } else {
                 // tradeType now indicates whethr it is partial repay or full
                 assembly {
-                    tradeType := mload(add(add(data, 0x1), 68)) // will only be used in last hop
+                    tradeType := mload(add(add(data, 0x1), 44)) // will only be used in last hop
                 }
                 // withraw and send funds to the pool
                 if (tokenOut == NATIVE_WRAPPER) {

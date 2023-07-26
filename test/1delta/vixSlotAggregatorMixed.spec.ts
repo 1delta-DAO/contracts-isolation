@@ -2,17 +2,19 @@ import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 import { ethers, network, waffle } from 'hardhat'
 import { expect } from './shared/expect'
 import { CompoundFixture, CompoundOptions, generateCompoundFixture, ONE_18 } from './shared/compoundFixture'
-import { Slot__factory, ERC20Mock__factory, OVixLensZK__factory, OVixLensZK, AlgebraCallback, SlotFactory__factory, FlexSlotFactory, FlexSlotFactory__factory, ImplementationProvider, ImplementationProvider__factory, Slot, FiatWithPermit, DeltaModuleProvider, DeltaModuleProvider__factory, VixSlotFactory, SlotFactoryProxy__factory, VixSlotFactory__factory, AlgebraCallback__factory, DataProvider, DataProvider__factory, VixInitialize, VixInitialize__factory, VixDirect, VixDirect__factory } from '../../types';
+import { Slot__factory, ERC20Mock__factory, OVixLensZK__factory, OVixLensZK, Slot, FiatWithPermit, DeltaModuleProvider, DeltaModuleProvider__factory, VixSlotFactory, SlotFactoryProxy__factory, VixSlotFactory__factory, AlgebraCallback__factory, DataProvider, DataProvider__factory, VixInitialize, VixInitialize__factory, VixDirect, VixDirect__factory, VixInitializeAggregator, AggregatorCallback, AggregatorCallback__factory, VixInitializeAggregator__factory } from '../../types';
 import { BigNumber, constants } from 'ethers';
 import { expandTo18Decimals } from '../uniswap-v3/core/shared/utilities';
 import { feedCompound, feedCompoundETH } from './shared/misc';
-import { encodeAddress, encodeAlgebraPathEthersSimple } from '../uniswap-v3/periphery/shared/path';
+import { encodeAddress, encodeAlgebraPathEthers } from '../uniswap-v3/periphery/shared/path';
 import { formatEther } from 'ethers/lib/utils';
 import { addAlgebraLiquidity, algebraFixture, AlgebraFixture } from './shared/algebraFixture';
 import { tokenFixture, TokenFixture } from './shared/tokensFixture';
 import { MockProvider } from 'ethereum-waffle';
 import { produceSig } from './shared/permitUtils';
 import { getSelectors, ModuleConfigAction } from './helpers/diamond';
+import { addUniswapLiquidity, uniswapMinimalFixtureNoTokens, UniswapMinimalFixtureNoTokens } from './shared/uniswapFixture';
+import { FeeAmount } from '../uniswap-v3/periphery/shared/constants';
 
 const approve = async (signer: SignerWithAddress, token: string, spender: string) => {
     const tokenConttract = await new ERC20Mock__factory(signer).attach(token)
@@ -24,10 +26,11 @@ const toNumber = (n: BigNumber | string) => {
 }
 
 // Tests all configurations for the minimal slot variant
-describe('Diamond Slot trading via data provider', async () => {
+describe('Diamond Slot aggregation trading via data provider', async () => {
     let deployer: SignerWithAddress, alice: SignerWithAddress, bob: SignerWithAddress, carol: SignerWithAddress;
     let compoundFixture: CompoundFixture
     let opts: CompoundOptions
+    let uniswap: UniswapMinimalFixtureNoTokens
     let algebra: AlgebraFixture
     let tokenData: TokenFixture
     let provider: MockProvider
@@ -35,15 +38,16 @@ describe('Diamond Slot trading via data provider', async () => {
     let moduleProvider: DeltaModuleProvider
     let factory: VixSlotFactory
     let factoryImplementation: VixSlotFactory
-    let callback: AlgebraCallback
+    let callback: AggregatorCallback
     let dataProvider: DataProvider
-    let initializer: VixInitialize
+    let initializer: VixInitializeAggregator
     let direct: VixDirect
 
     before('get wallets and fixture', async () => {
         [deployer, alice, bob, carol] = await ethers.getSigners();
         tokenData = await tokenFixture(deployer, 6)
         algebra = await algebraFixture(deployer, tokenData.wnative.address)
+        uniswap = await uniswapMinimalFixtureNoTokens(deployer, tokenData.wnative.address)
         provider = waffle.provider;
         opts = {
             underlyings: tokenData.tokens,
@@ -98,17 +102,17 @@ describe('Diamond Slot trading via data provider', async () => {
 
         lens = await new OVixLensZK__factory(deployer).deploy()
 
-        // MODULES
-
         moduleProvider = await new DeltaModuleProvider__factory(deployer).deploy()
 
-        callback = await new AlgebraCallback__factory(deployer).deploy(
+        callback = await new AggregatorCallback__factory(deployer).deploy(
             algebra.poolDeployer.address,
+            uniswap.factory.address,
             dataProvider.address,
             tokenData.wnative.address
         )
-        initializer = await new VixInitialize__factory(deployer).deploy(
+        initializer = await new VixInitializeAggregator__factory(deployer).deploy(
             algebra.poolDeployer.address,
+            uniswap.factory.address,
             dataProvider.address,
             tokenData.wnative.address
         )
@@ -157,6 +161,8 @@ describe('Diamond Slot trading via data provider', async () => {
         await feedCompoundETH(deployer, compoundFixture)
 
 
+        // ALGEBRA LIQUDITY
+
         console.log("add WETH 0")
         await addAlgebraLiquidity(
             deployer,
@@ -166,9 +172,6 @@ describe('Diamond Slot trading via data provider', async () => {
             expandTo18Decimals(1_000),
             algebra
         )
-
-
-        // ALGEBRA LIQUDITY
 
         console.log("add 3 4")
         await addAlgebraLiquidity(
@@ -210,6 +213,57 @@ describe('Diamond Slot trading via data provider', async () => {
             algebra
         )
 
+        // UNISWAP LIQUIDITY
+
+        console.log("add WETH 0")
+        await addUniswapLiquidity(
+            deployer,
+            tokenData.wnative.address,
+            tokenData.tokens[0].address,
+            expandTo18Decimals(100),
+            expandTo18Decimals(100),
+            uniswap
+        )
+
+        console.log("add 0 1")
+        await addUniswapLiquidity(
+            deployer,
+            tokenData.tokens[0].address,
+            tokenData.tokens[1].address,
+            expandTo18Decimals(1_000_000),
+            expandTo18Decimals(1_000_000),
+            uniswap
+        )
+
+        console.log("add 1 2")
+        await addUniswapLiquidity(
+            deployer,
+            tokenData.tokens[1].address,
+            tokenData.tokens[2].address,
+            expandTo18Decimals(1_000_000),
+            expandTo18Decimals(1_000_000),
+            uniswap
+        )
+
+        console.log("add 2 3")
+        await addUniswapLiquidity(
+            deployer,
+            tokenData.tokens[2].address,
+            tokenData.tokens[3].address,
+            expandTo18Decimals(1_000_000),
+            expandTo18Decimals(1_000_000),
+            uniswap
+        )
+
+        console.log("add 3 4")
+        await addUniswapLiquidity(
+            deployer,
+            tokenData.tokens[3].address,
+            tokenData.tokens[4].address,
+            expandTo18Decimals(1_000_000),
+            expandTo18Decimals(1_000_000),
+            uniswap
+        )
 
     })
 
@@ -277,7 +331,9 @@ describe('Diamond Slot trading via data provider', async () => {
         const swapAmount = expandTo18Decimals(50)
 
         let _tokensInRoute = routeIndexes.map(t => compoundFixture.underlyings[t].address)
-        const path = encodeAlgebraPathEthersSimple(_tokensInRoute, [0, 3, 3], 0)
+        const path = encodeAlgebraPathEthers(_tokensInRoute,
+            new Array(_tokensInRoute.length - 1).fill(FeeAmount.ALGEBRA),
+            [0, 3, 3], 0)
 
         const swapPath = encodeAddress(compoundFixture.underlyings[inIndex].address)
 
@@ -316,7 +372,8 @@ describe('Diamond Slot trading via data provider', async () => {
         const swapAmount = expandTo18Decimals(50)
 
         let _tokensInRoute = routeIndexes.map(t => compoundFixture.underlyings[t].address)
-        const path = encodeAlgebraPathEthersSimple(_tokensInRoute, [0, 3, 3], 0)
+        const path = encodeAlgebraPathEthers(_tokensInRoute, new Array(_tokensInRoute.length - 1).fill(FeeAmount.ALGEBRA),
+            [0, 3, 3], 0)
 
         const swapPath = encodeAddress(compoundFixture.underlyings[inIndex].address)
 
@@ -368,7 +425,9 @@ describe('Diamond Slot trading via data provider', async () => {
         const swapAmount = expandTo18Decimals(50)
 
         let _tokensInRoute = routeIndexes.map(t => compoundFixture.underlyings[t].address)
-        const path = encodeAlgebraPathEthersSimple(_tokensInRoute, [0, 3, 3], 0)
+        const path = encodeAlgebraPathEthers(_tokensInRoute,
+            new Array(_tokensInRoute.length - 1).fill(FeeAmount.ALGEBRA),
+            [0, 3, 3], 0)
 
         const swapPath = encodeAddress(compoundFixture.underlyings[inIndex].address)
 
@@ -410,8 +469,9 @@ describe('Diamond Slot trading via data provider', async () => {
         const balPost = await compoundFixture.underlyings[supplyIndex].balanceOf(alice.address)
 
         expect(toNumber(balPost.sub(balPre))).to.greaterThanOrEqual(toNumber(supplyPost) * 0.9999)
-        const pathVaid = encodeAlgebraPathEthersSimple(
+        const pathVaid = encodeAlgebraPathEthers(
             _tokensInRoute,
+            new Array(_tokensInRoute.length - 1).fill(FeeAmount.ALGEBRA),
             [1, 2, 2],
             0
         )
@@ -431,8 +491,9 @@ describe('Diamond Slot trading via data provider', async () => {
         const routeIndexes = [3, 2, 1, 0]
 
         let _tokensInRoute = routeIndexes.map(t => compoundFixture.underlyings[t].address)
-        const path = encodeAlgebraPathEthersSimple(
+        const path = encodeAlgebraPathEthers(
             _tokensInRoute,
+            new Array(_tokensInRoute.length - 1).fill(FeeAmount.ALGEBRA),
             [1, 2, 2],
             0
         )
@@ -466,10 +527,16 @@ describe('Diamond Slot trading via data provider', async () => {
         const routeIndexesSwapIn = [2, 1, 0]
 
         let _tokensInRoute = routeIndexes.map(t => compoundFixture.underlyings[t].address)
-        const path = encodeAlgebraPathEthersSimple(_tokensInRoute, [0, 3, 3], 0)
+        const path = encodeAlgebraPathEthers(
+            _tokensInRoute,
+            [FeeAmount.ALGEBRA, FeeAmount.MEDIUM, FeeAmount.ALGEBRA],
+            [0, 3, 3], 0)
 
         let _tokensInRouteSwapIn = routeIndexesSwapIn.map(t => compoundFixture.underlyings[t].address)
-        const swapPath = encodeAlgebraPathEthersSimple(_tokensInRouteSwapIn, [3, 3], 0)
+        const swapPath = encodeAlgebraPathEthers(
+            _tokensInRouteSwapIn,
+            [FeeAmount.MEDIUM],
+            [3, 3], 0)
 
         const params = {
             amountDeposited: depositAmount,
@@ -509,10 +576,15 @@ describe('Diamond Slot trading via data provider', async () => {
         const routeIndexesSwapIn = [2, 1, 0]
 
         let _tokensInRoute = routeIndexes.map(t => compoundFixture.underlyings[t].address)
-        const path = encodeAlgebraPathEthersSimple(_tokensInRoute, [0, 3, 3], 0)
+        const path = encodeAlgebraPathEthers(_tokensInRoute,
+            new Array(_tokensInRoute.length - 1).fill(FeeAmount.MEDIUM),
+            [0, 3, 3], 0)
 
         let _tokensInRouteSwapIn = routeIndexesSwapIn.map(t => compoundFixture.underlyings[t].address)
-        const swapPath = encodeAlgebraPathEthersSimple(_tokensInRouteSwapIn, [3, 3], 0)
+        const swapPath = encodeAlgebraPathEthers(
+            _tokensInRouteSwapIn,
+            new Array(_tokensInRouteSwapIn.length - 1).fill(FeeAmount.MEDIUM),
+            [3, 3], 0)
 
 
         // approve
@@ -562,10 +634,16 @@ describe('Diamond Slot trading via data provider', async () => {
         const swapAmount = expandTo18Decimals(5).div(1000)
 
         let _tokensInRoute = routeIndexes.map(t => compoundFixture.underlyings[t].address)
-        const path = encodeAlgebraPathEthersSimple(_tokensInRoute, [0, 3, 3], 0)
+        const path = encodeAlgebraPathEthers(_tokensInRoute, new Array(_tokensInRoute.length - 1).fill(FeeAmount.ALGEBRA),
+            [0, 3, 3], 0)
 
         let _tokensInRouteSwapIn = [tokenData.wnative.address, compoundFixture.underlyings[0].address]
-        const swapPath = encodeAlgebraPathEthersSimple(_tokensInRouteSwapIn, [3], 0)
+        const swapPath = encodeAlgebraPathEthers(
+            _tokensInRouteSwapIn,
+            new Array(_tokensInRouteSwapIn.length - 1).fill(FeeAmount.ALGEBRA),
+            [3],
+            0
+        )
 
         const params = {
             amountDeposited: depositAmount,
@@ -602,8 +680,9 @@ describe('Diamond Slot trading via data provider', async () => {
         const swapAmount = expandTo18Decimals(50)
 
         let _tokensInRoute = routeIndexes.map(t => compoundFixture.underlyings[t].address)
-        const path = encodeAlgebraPathEthersSimple(
+        const path = encodeAlgebraPathEthers(
             _tokensInRoute,
+            new Array(_tokensInRoute.length - 1).fill(FeeAmount.ALGEBRA),
             [0, 3, 3],
             0
         )
@@ -647,10 +726,15 @@ describe('Diamond Slot trading via data provider', async () => {
         const routeIndexesSwapIn = [2, 1, 0]
 
         let _tokensInRoute = routeIndexes.map(t => compoundFixture.underlyings[t].address)
-        const path = encodeAlgebraPathEthersSimple(_tokensInRoute, [0, 3, 3], 0)
+        const path = encodeAlgebraPathEthers(_tokensInRoute, new Array(_tokensInRoute.length - 1).fill(FeeAmount.ALGEBRA),
+            [0, 3, 3], 0)
 
         let _tokensInRouteSwapIn = routeIndexesSwapIn.map(t => compoundFixture.underlyings[t].address)
-        const swapPath = encodeAlgebraPathEthersSimple(_tokensInRouteSwapIn, [3, 3], 0)
+        const swapPath = encodeAlgebraPathEthers(
+            _tokensInRouteSwapIn,
+            new Array(_tokensInRouteSwapIn.length - 1).fill(FeeAmount.ALGEBRA),
+            [3, 3],
+            0)
 
         const params = {
             amountDeposited: depositAmount,
@@ -684,8 +768,9 @@ describe('Diamond Slot trading via data provider', async () => {
         const depositAmount = expandTo18Decimals(10)
         const swapAmount = expandTo18Decimals(4)
 
-        const path = encodeAlgebraPathEthersSimple(
+        const path = encodeAlgebraPathEthers(
             [tokenData.tokens[0].address, tokenData.wnative.address],
+            [FeeAmount.ALGEBRA],
             [0],
             0
         )
@@ -720,8 +805,9 @@ describe('Diamond Slot trading via data provider', async () => {
         const slot = await Slot__factory.connect(projAddress, bob)
 
 
-        const closePath = encodeAlgebraPathEthersSimple(
+        const closePath = encodeAlgebraPathEthers(
             [tokenData.tokens[0].address, tokenData.wnative.address],
+            [FeeAmount.ALGEBRA],
             [1],
             0
         )
@@ -748,8 +834,9 @@ describe('Diamond Slot trading via data provider', async () => {
         const depositAmount = expandTo18Decimals(10)
         const swapAmount = expandTo18Decimals(4)
 
-        const path = encodeAlgebraPathEthersSimple(
+        const path = encodeAlgebraPathEthers(
             [tokenData.tokens[0].address, tokenData.wnative.address],
+            [FeeAmount.ALGEBRA],
             [0],
             0
         )
@@ -797,14 +884,16 @@ describe('Diamond Slot trading via data provider', async () => {
         const depositAmount = expandTo18Decimals(10)
         const swapAmount = expandTo18Decimals(4)
 
-        const path = encodeAlgebraPathEthersSimple(
+        const path = encodeAlgebraPathEthers(
             [tokenData.tokens[0].address, tokenData.wnative.address],
+            [FeeAmount.ALGEBRA],
             [0],
             0
         )
 
-        const swapPath = encodeAlgebraPathEthersSimple(
+        const swapPath = encodeAlgebraPathEthers(
             [tokenData.tokens[1].address, tokenData.tokens[0].address, tokenData.wnative.address],
+            [FeeAmount.ALGEBRA, FeeAmount.ALGEBRA],
             [3, 3],
             0
         )
@@ -837,8 +926,9 @@ describe('Diamond Slot trading via data provider', async () => {
         const slot = await Slot__factory.connect(projAddress, bob)
 
 
-        const closePath = encodeAlgebraPathEthersSimple(
+        const closePath = encodeAlgebraPathEthers(
             [tokenData.tokens[0].address, tokenData.wnative.address],
+            [FeeAmount.ALGEBRA],
             [1],
             0
         )
@@ -866,8 +956,9 @@ describe('Diamond Slot trading via data provider', async () => {
         const depositAmount = expandTo18Decimals(10)
         const swapAmount = expandTo18Decimals(4)
 
-        const path = encodeAlgebraPathEthersSimple(
+        const path = encodeAlgebraPathEthers(
             [tokenData.wnative.address, tokenData.tokens[0].address],
+            [FeeAmount.ALGEBRA],
             [0],
             0
         )
@@ -902,8 +993,9 @@ describe('Diamond Slot trading via data provider', async () => {
         const slot = await Slot__factory.connect(projAddress, bob)
 
 
-        const closePath = encodeAlgebraPathEthersSimple(
+        const closePath = encodeAlgebraPathEthers(
             [tokenData.wnative.address, tokenData.tokens[0].address],
+            [FeeAmount.ALGEBRA],
             [1],
             0
         )
@@ -932,8 +1024,9 @@ describe('Diamond Slot trading via data provider', async () => {
         const depositAmount = expandTo18Decimals(10)
         const swapAmount = expandTo18Decimals(4)
 
-        const path = encodeAlgebraPathEthersSimple(
+        const path = encodeAlgebraPathEthers(
             [tokenData.wnative.address, tokenData.tokens[0].address],
+            [FeeAmount.ALGEBRA],
             [0],
             0
         )
@@ -976,8 +1069,9 @@ describe('Diamond Slot trading via data provider', async () => {
         const depositAmount = expandTo18Decimals(10)
         const swapAmount = expandTo18Decimals(4)
 
-        const path = encodeAlgebraPathEthersSimple(
+        const path = encodeAlgebraPathEthers(
             [tokenData.tokens[1].address, tokenData.tokens[0].address, tokenData.wnative.address],
+            [FeeAmount.ALGEBRA, FeeAmount.ALGEBRA],
             [0, 3],
             0
         )
@@ -1012,8 +1106,9 @@ describe('Diamond Slot trading via data provider', async () => {
         const slot = await Slot__factory.connect(projAddress, bob)
 
 
-        const closePath = encodeAlgebraPathEthersSimple(
+        const closePath = encodeAlgebraPathEthers(
             [tokenData.tokens[1].address, tokenData.tokens[0].address, tokenData.wnative.address],
+            [FeeAmount.ALGEBRA, FeeAmount.ALGEBRA],
             [1, 2],
             0
         )
@@ -1042,8 +1137,9 @@ describe('Diamond Slot trading via data provider', async () => {
         const depositAmount = expandTo18Decimals(10)
         const swapAmount = expandTo18Decimals(4)
 
-        const path = encodeAlgebraPathEthersSimple(
+        const path = encodeAlgebraPathEthers(
             [tokenData.wnative.address, tokenData.tokens[0].address, tokenData.tokens[1].address],
+            [FeeAmount.ALGEBRA, FeeAmount.ALGEBRA],
             [0, 3],
             0
         )
@@ -1078,8 +1174,9 @@ describe('Diamond Slot trading via data provider', async () => {
         const slot = await Slot__factory.connect(projAddress, bob)
 
 
-        const closePath = encodeAlgebraPathEthersSimple(
+        const closePath = encodeAlgebraPathEthers(
             [tokenData.wnative.address, tokenData.tokens[0].address, tokenData.tokens[1].address],
+            [FeeAmount.ALGEBRA, FeeAmount.ALGEBRA],
             [1, 2],
             0
         )

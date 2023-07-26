@@ -67,8 +67,8 @@ export function encodeAlgebraPathEthers(path: string[], fees: FeeAmount[], flags
   data.push(path[path.length - 1])
   data.push(String(flag))
 
-  console.log(data)
-  console.log(types)
+  // console.log(data)
+  // console.log(types)
 
   return ethers.utils.solidityPack(types, data)
 }

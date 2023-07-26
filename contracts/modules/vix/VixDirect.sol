@@ -23,11 +23,10 @@ contract VixDirect is WithVixStorage, TokenTransfer {
     address private immutable NATIVE_WRAPPER;
 
     constructor(
-        address _factory,
         address _dataProvider,
         address _weth
     ) {
-        FACTORY = _factory;
+        FACTORY = msg.sender;
         DATA_PROVIDER = _dataProvider;
         NATIVE_WRAPPER = _weth;
     }
