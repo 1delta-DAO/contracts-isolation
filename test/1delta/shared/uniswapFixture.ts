@@ -9,7 +9,6 @@ import {
     FiatWithPermit__factory,
     UniswapV3Factory,
     IERC20,
-    MinimalSwapRouter,
     IERC20__factory,
 } from '../../../types'
 import { minimalUniswapV3RouterFixtureNoWETH, uniswapV3RouterFixture, uniswapV3RouterFixtureNoWETH } from './unsiwapRouter'
@@ -112,13 +111,12 @@ export async function uniswapFixtureNoTokens(signer: SignerWithAddress, wethAddr
 
 export interface UniswapMinimalFixtureNoTokens {
     factory: UniswapV3Factory
-    router: MinimalSwapRouter
     nft: MockTimeNonfungiblePositionManager
     nftDescriptor: NonfungibleTokenPositionDescriptor
 }
 
 export async function uniswapMinimalFixtureNoTokens(signer: SignerWithAddress, wethAddress: string): Promise<UniswapMinimalFixtureNoTokens> {
-    const { factory, router } = await minimalUniswapV3RouterFixtureNoWETH(signer, wethAddress)
+    const { factory } = await minimalUniswapV3RouterFixtureNoWETH(signer, wethAddress)
 
 
     const nftDescriptorLibraryFactory = await ethers.getContractFactory('NFTDescriptor')
@@ -144,7 +142,6 @@ export async function uniswapMinimalFixtureNoTokens(signer: SignerWithAddress, w
 
     return {
         factory,
-        router,
         nft,
         nftDescriptor,
     }

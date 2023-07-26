@@ -1,5 +1,5 @@
 import { ethers, waffle } from 'hardhat'
-import { IWETH9, MinimalSwapRouter, MockTimeSwapRouter, UniswapV3Factory, UniswapV3Factory__factory, WETH9__factory } from '../../../types'
+import { IWETH9, MockTimeSwapRouter, UniswapV3Factory, UniswapV3Factory__factory, WETH9__factory } from '../../../types'
 
 import WETH9Artifact from '../contracts/WETH9.json'
 
@@ -45,18 +45,12 @@ export async function uniswapV3RouterFixtureNoWETH(signer: SignerWithAddress, we
 
 export interface RouterFixtureMinimal {
     factory: UniswapV3Factory
-    router: MinimalSwapRouter
 }
 
 export async function minimalUniswapV3RouterFixtureNoWETH(signer: SignerWithAddress, wethAddress: string): Promise<RouterFixtureMinimal> {
 
     const factory = await new UniswapV3Factory__factory(signer).deploy()
 
-    const router = (await (await ethers.getContractFactory('MinimalSwapRouter')).deploy(
-        factory.address,
-        wethAddress
-    )) as MinimalSwapRouter
-
-    return { factory, router }
+    return { factory }
 }
 

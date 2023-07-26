@@ -7,7 +7,6 @@ import "./libraries/FullMath.sol";
 import "../../../external-protocols/algebra/core/interfaces/callback/IAlgebraSwapCallback.sol";
 import {BytesLib} from "../../../dex-tools/uniswap/libraries/BytesLib.sol";
 import {Path} from "../../../dex-tools/uniswap/libraries/QuotePath.sol";
-
 interface ISwapPool {
     function swap(
         address recipient,
@@ -16,10 +15,9 @@ interface ISwapPool {
         uint160 limitSqrtPrice,
         bytes calldata data
     ) external returns (int256 amount0, int256 amount1);
-  function token0() external view returns (address);
 }
 
-contract AggregationQuoter {
+contract AggregationQuoterLive {
     using BytesLib for bytes;
     using Path for bytes;
     using SafeCast for uint256;
@@ -33,65 +31,63 @@ contract AggregationQuoter {
     uint256 private constant UINT24_MASK = 0xffffff;
 
     // the used address is the algebra pool deployer
-    bytes32 private immutable ALG_FF_FACTORY_ADDRESS;
-    bytes32 private immutable ALG_POOL_CODE_HASH;
+    bytes32 private constant ALG_FF_FACTORY_ADDRESS = 0xff0d500b1d8e8ef31e21c99d1db9a6444d3adf12700000000000000000000000;
+    bytes32 private constant ALG_POOL_CODE_HASH = 0x6ec6c9c8091d160c0aa74b2b14ba9c1717e95093bd3ac085cee99a49aab294a4;
 
-    bytes32 private immutable DOV_FF_FACTORY_ADDRESS;
-    bytes32 private immutable DOV_POOL_INIT_CODE_HASH;
+    bytes32 private constant DOV_FF_FACTORY_ADDRESS = 0xffde474db1fa59898bc91314328d29507acd0d593c0000000000000000000000;
+    bytes32 private constant DOV_POOL_INIT_CODE_HASH = 0xd3e7f58b9af034cfa7a0597e539bae7c6b393817a47a6fc1e1503cd6eaffe22a;
 
-    constructor(
-        address _algebraDeployer,
-        address _doveFactory,
-        bytes32 algebraHash,
-        bytes32 doveHash
-    ) {
-        DOV_FF_FACTORY_ADDRESS = bytes32((uint256(0xff) << 248) | (uint256(uint160(_doveFactory)) << 88));
-        ALG_POOL_CODE_HASH = algebraHash;
-        ALG_FF_FACTORY_ADDRESS = bytes32((uint256(0xff) << 248) | (uint256(uint160(_algebraDeployer)) << 88));
-        DOV_POOL_INIT_CODE_HASH = doveHash;
-    }
+    constructor() {}
 
     // Compute the pool address given two tokens and a fee.
     function _toPool(
         address inputToken,
         uint24 fee,
         address outputToken
-    ) internal view returns (ISwapPool pool) {
-        if (fee != 0) {
-            // Uniswap V3
-            bytes32 ffFactoryAddress = DOV_FF_FACTORY_ADDRESS;
-            bytes32 poolInitCodeHash = DOV_POOL_INIT_CODE_HASH;
-            (address token0, address token1) = inputToken < outputToken ? (inputToken, outputToken) : (outputToken, inputToken);
-            assembly {
-                let s := mload(0x40)
-                let p := s
-                mstore(p, ffFactoryAddress)
+    ) internal pure returns (ISwapPool pool) {
+        
+        assembly {
+            let pairOrder := lt(inputToken, outputToken)
+            let s := mload(0x40)
+            let p := s
+            switch fee
+            // ALGEBRA
+            case 0 {
+                mstore(p, ALG_FF_FACTORY_ADDRESS)
                 p := add(p, 21)
                 // Compute the inner hash in-place
-                mstore(p, token0)
-                mstore(add(p, 32), token1)
+                switch pairOrder
+                case 0 {
+                    mstore(p, outputToken)
+                    mstore(add(p, 32), inputToken)
+                }
+                default {
+                    mstore(p, inputToken)
+                    mstore(add(p, 32), outputToken)
+                }
+                mstore(p, keccak256(p, 64))
+                p := add(p, 32)
+                mstore(p, ALG_POOL_CODE_HASH)
+                pool := and(ADDRESS_MASK, keccak256(s, 85))
+            }
+            // DOVE
+            default {
+                mstore(p, DOV_FF_FACTORY_ADDRESS)
+                p := add(p, 21)
+                // Compute the inner hash in-place
+                switch pairOrder
+                case 0 {
+                    mstore(p, outputToken)
+                    mstore(add(p, 32), inputToken)
+                }
+                default {
+                    mstore(p, inputToken)
+                    mstore(add(p, 32), outputToken)
+                }
                 mstore(add(p, 64), and(UINT24_MASK, fee))
                 mstore(p, keccak256(p, 96))
                 p := add(p, 32)
-                mstore(p, poolInitCodeHash)
-                pool := and(ADDRESS_MASK, keccak256(s, 85))
-            }
-        } else {
-            // Algebra Pool
-            bytes32 ffFactoryAddress = ALG_FF_FACTORY_ADDRESS;
-            bytes32 poolInitCodeHash = ALG_POOL_CODE_HASH;
-            (address token0, address token1) = inputToken < outputToken ? (inputToken, outputToken) : (outputToken, inputToken);
-            assembly {
-                let s := mload(0x40)
-                let p := s
-                mstore(p, ffFactoryAddress)
-                p := add(p, 21)
-                // Compute the inner hash in-place
-                mstore(p, token0)
-                mstore(add(p, 32), token1)
-                mstore(p, keccak256(p, 64))
-                p := add(p, 32)
-                mstore(p, poolInitCodeHash)
+                mstore(p, DOV_POOL_INIT_CODE_HASH)
                 pool := and(ADDRESS_MASK, keccak256(s, 85))
             }
         }
@@ -129,7 +125,7 @@ contract AggregationQuoter {
         int256 amount0Delta,
         int256 amount1Delta,
         bytes memory path
-    ) external view {         
+    ) external view {
         require(amount0Delta > 0 || amount1Delta > 0); // swaps entirely within 0-liquidity regions are not supported
         (address tokenIn, address tokenOut, ) = path.decodeFirstPool();
         (bool isExactInput, uint256 amountToPay, uint256 amountReceived) = amount0Delta > 0
@@ -171,8 +167,7 @@ contract AggregationQuoter {
         uint256 amountIn,
         uint160 sqrtPriceLimitX96
     ) public returns (uint256 amountOut) {
-        bool zeroForOne = tokenIn < tokenOut;
-
+        bool zeroForOne = tokenIn < tokenOut;    
         try
             _toPool(tokenIn, fee, tokenOut).swap(
                 address(this), // address(0) might cause issues with some tokens

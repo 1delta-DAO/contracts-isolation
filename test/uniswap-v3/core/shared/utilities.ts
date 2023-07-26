@@ -36,6 +36,12 @@ export function expandTo18Decimals(n: number): BigNumber {
   return BigNumber.from(n).mul(BigNumber.from(10).pow(18))
 }
 
+export function expandToDecimals(n: number, d = 18): BigNumber {
+  return BigNumber.from(n).mul(BigNumber.from(10).pow(d))
+}
+
+
+
 export function getCreate2Address(
   factoryAddress: string,
   [tokenA, tokenB]: [string, string],

@@ -16,14 +16,9 @@ import { getSelectors, ModuleConfigAction } from './helpers/diamond';
 import { addUniswapLiquidity, uniswapMinimalFixtureNoTokens, UniswapMinimalFixtureNoTokens } from './shared/uniswapFixture';
 import { FeeAmount } from '../uniswap-v3/periphery/shared/constants';
 
-const approve = async (signer: SignerWithAddress, token: string, spender: string) => {
-    const tokenConttract = await new ERC20Mock__factory(signer).attach(token)
-    await tokenConttract.approve(spender, constants.MaxUint256)
-}
+const ALG_POOL_CODE_HASH = '0x15b69bf972c5c2df89dd7772b62e872d4048b3741a214df60be904ec5620d9df';
+const DOV_POOL_INIT_CODE_HASH = '0xe34f199b19b2b4f47f68442619d555527d244f78a3297ea89325f843f87b8b54';
 
-const toNumber = (n: BigNumber | string) => {
-    return Number(formatEther(n))
-}
 
 // Tests all configurations for the minimal slot variant
 describe('Diamond Slot aggregation trading via data provider', async () => {
@@ -43,9 +38,12 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
         provider = waffle.provider;
 
         dataProvider = await new DataProvider__factory(deployer).deploy()
+
         quoter = await new AggregationQuoter__factory(deployer).deploy(
             algebra.poolDeployer.address,
-            uniswap.factory.address
+            uniswap.factory.address,
+            ALG_POOL_CODE_HASH,
+            DOV_POOL_INIT_CODE_HASH
         )
 
         await tokenData.wnative.connect(deployer).deposit({ value: expandTo18Decimals(1_500) })
@@ -188,7 +186,7 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
         const swapAmount = expandTo18Decimals(50)
 
         let _tokensInRoute = routeIndexes.map(t => tokenData.tokens[t].address)
-        console.log("_tokensInRoute",_tokensInRoute)
+        console.log("_tokensInRoute", _tokensInRoute)
         const path = encodePath(
             _tokensInRoute,
             [FeeAmount.ALGEBRA, FeeAmount.MEDIUM, FeeAmount.MEDIUM],
