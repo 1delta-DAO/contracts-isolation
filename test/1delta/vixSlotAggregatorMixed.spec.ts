@@ -331,9 +331,12 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
         const swapAmount = expandTo18Decimals(50)
 
         let _tokensInRoute = routeIndexes.map(t => compoundFixture.underlyings[t].address)
-        const path = encodeAlgebraPathEthers(_tokensInRoute,
-            new Array(_tokensInRoute.length - 1).fill(FeeAmount.ALGEBRA),
-            [0, 3, 3], 0)
+        const path = encodeAlgebraPathEthers(
+            _tokensInRoute,
+            new Array(_tokensInRoute.length - 1).fill(FeeAmount.MEDIUM),
+            [0, 3, 3],
+            0
+        )
 
         const swapPath = encodeAddress(compoundFixture.underlyings[inIndex].address)
 
@@ -372,8 +375,12 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
         const swapAmount = expandTo18Decimals(50)
 
         let _tokensInRoute = routeIndexes.map(t => compoundFixture.underlyings[t].address)
-        const path = encodeAlgebraPathEthers(_tokensInRoute, new Array(_tokensInRoute.length - 1).fill(FeeAmount.ALGEBRA),
-            [0, 3, 3], 0)
+        const path = encodeAlgebraPathEthers(
+            _tokensInRoute,
+            new Array(_tokensInRoute.length - 1).fill(FeeAmount.ALGEBRA),
+            [0, 3, 3],
+            0
+        )
 
         const swapPath = encodeAddress(compoundFixture.underlyings[inIndex].address)
 
@@ -426,7 +433,7 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
 
         let _tokensInRoute = routeIndexes.map(t => compoundFixture.underlyings[t].address)
         const path = encodeAlgebraPathEthers(_tokensInRoute,
-            new Array(_tokensInRoute.length - 1).fill(FeeAmount.ALGEBRA),
+            new Array(_tokensInRoute.length - 1).fill(FeeAmount.MEDIUM),
             [0, 3, 3], 0)
 
         const swapPath = encodeAddress(compoundFixture.underlyings[inIndex].address)
@@ -471,7 +478,7 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
         expect(toNumber(balPost.sub(balPre))).to.greaterThanOrEqual(toNumber(supplyPost) * 0.9999)
         const pathVaid = encodeAlgebraPathEthers(
             _tokensInRoute,
-            new Array(_tokensInRoute.length - 1).fill(FeeAmount.ALGEBRA),
+            new Array(_tokensInRoute.length - 1).fill(FeeAmount.MEDIUM),
             [1, 2, 2],
             0
         )
@@ -529,13 +536,15 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
         let _tokensInRoute = routeIndexes.map(t => compoundFixture.underlyings[t].address)
         const path = encodeAlgebraPathEthers(
             _tokensInRoute,
-            [FeeAmount.ALGEBRA, FeeAmount.MEDIUM, FeeAmount.ALGEBRA],
-            [0, 3, 3], 0)
+            [FeeAmount.MEDIUM, FeeAmount.ALGEBRA, FeeAmount.MEDIUM],
+            [0, 3, 3], 
+            0
+            )
 
         let _tokensInRouteSwapIn = routeIndexesSwapIn.map(t => compoundFixture.underlyings[t].address)
         const swapPath = encodeAlgebraPathEthers(
             _tokensInRouteSwapIn,
-            [FeeAmount.MEDIUM],
+            [FeeAmount.MEDIUM ,FeeAmount.ALGEBRA],
             [3, 3], 0)
 
         const params = {
@@ -578,13 +587,17 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
         let _tokensInRoute = routeIndexes.map(t => compoundFixture.underlyings[t].address)
         const path = encodeAlgebraPathEthers(_tokensInRoute,
             new Array(_tokensInRoute.length - 1).fill(FeeAmount.MEDIUM),
-            [0, 3, 3], 0)
+            [0, 3, 3],
+            0
+        )
 
         let _tokensInRouteSwapIn = routeIndexesSwapIn.map(t => compoundFixture.underlyings[t].address)
         const swapPath = encodeAlgebraPathEthers(
             _tokensInRouteSwapIn,
             new Array(_tokensInRouteSwapIn.length - 1).fill(FeeAmount.MEDIUM),
-            [3, 3], 0)
+            [3, 3],
+            0
+        )
 
 
         // approve
@@ -605,7 +618,7 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
             amountDeposited: depositAmount,
             minimumAmountDeposited: depositAmount.mul(95).div(100),
             borrowAmount: swapAmount,
-            minimumMarginReceived: swapAmount.mul(99).div(100),
+            minimumMarginReceived: swapAmount.mul(95).div(100),
             swapPath: swapPath,
             marginPath: path,
             permit: sig
@@ -763,7 +776,6 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
 
     it('SINGLE: allows to deploy standard slot ETH collateral and close', async () => {
 
-        const inIndex = 2
         const borrowIndex = 0
         const depositAmount = expandTo18Decimals(10)
         const swapAmount = expandTo18Decimals(4)

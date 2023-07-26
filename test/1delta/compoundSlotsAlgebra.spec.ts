@@ -251,7 +251,12 @@ describe('Compound Slot Trading', async () => {
         const swapAmount = expandTo18Decimals(50)
 
         let _tokensInRoute = routeIndexes.map(t => compoundFixture.underlyings[t].address)
-        const path = encodeAlgebraPathEthers(_tokensInRoute, new Array(_tokensInRoute.length - 1).fill(FeeAmount.MEDIUM), [0, 3, 3], 0)
+        const path = encodeAlgebraPathEthers(
+            _tokensInRoute,
+            new Array(_tokensInRoute.length - 1).fill(FeeAmount.MEDIUM),
+            [0, 3, 3],
+            0
+        )
 
         const swapPath = encodeAddress(compoundFixture.underlyings[inIndex].address)
 

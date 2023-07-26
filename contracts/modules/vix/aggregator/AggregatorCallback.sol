@@ -14,7 +14,6 @@ import {ICompoundTypeCEther, ICompoundTypeCERC20, IDataProvider} from "../data-p
 import {TokenTransfer} from "../../../utils/TokenTransfer.sol";
 import {WithVixStorage} from "../VixStorage.sol";
 import {BaseAggregator} from "./BaseAggregator.sol";
-import "hardhat/console.sol";
 
 // solhint-disable max-line-length
 
@@ -64,10 +63,9 @@ contract AggregatorCallback is BaseAggregator, TokenTransfer, WithVixStorage {
     function _swapCallback(
         int256 amount0Delta,
         int256 amount1Delta,
-        bytes calldata _data
+        bytes memory data
     ) private {
         // create datacopy to memory
-        bytes memory data = _data;
         uint8 tradeType;
         address tokenIn;
         address tokenOut;
@@ -78,6 +76,7 @@ contract AggregatorCallback is BaseAggregator, TokenTransfer, WithVixStorage {
             tradeType := mload(add(add(data, 0x1), 23))
             tokenOut := div(mload(add(add(data, 0x20), 24)), 0x1000000000000000000000000)
         }
+
         {
             require(msg.sender == address(_toPool(tokenIn, fee, tokenOut)), "Inavlid Callback");
         }

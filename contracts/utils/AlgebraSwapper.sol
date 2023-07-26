@@ -387,7 +387,6 @@ abstract contract AlgebraSwapper is CTokenHolder {
                 fee := mload(add(add(exactInputData, 0x3), 20))
                 tokenOut := div(mload(add(add(exactInputData, 0x20), 24)), 0x1000000000000000000000000)
             }
-
             bool zeroForOne = tokenIn < tokenOut;
             (int256 amount0, int256 amount1) = _toPool(tokenIn, fee, tokenOut).swap(
                 address(this),

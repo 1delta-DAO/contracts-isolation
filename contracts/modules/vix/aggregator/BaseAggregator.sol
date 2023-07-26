@@ -29,11 +29,10 @@ abstract contract BaseAggregator {
 
     // the used address is the algebra pool deployer
     bytes32 private immutable ALG_FF_FACTORY_ADDRESS;
-    // bytes32((uint256(0xff) << 248) | (uint256(uint160(0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270)) << 88));
     bytes32 private constant ALG_POOL_CODE_HASH = 0x15b69bf972c5c2df89dd7772b62e872d4048b3741a214df60be904ec5620d9df;
 
     bytes32 private immutable DOV_FF_FACTORY_ADDRESS;
-    bytes32 private immutable DOV_POOL_INIT_CODE_HASH = 0x15b69bf972c5c2df89dd7772b62e872d4048b3741a214df60be904ec5620d9df;
+    bytes32 private immutable DOV_POOL_INIT_CODE_HASH = 0xe34f199b19b2b4f47f68442619d555527d244f78a3297ea89325f843f87b8b54;
 
     constructor(address _algebraDeployer, address _doveFactory) {
         DOV_FF_FACTORY_ADDRESS = bytes32((uint256(0xff) << 248) | (uint256(uint160(_doveFactory)) << 88));
