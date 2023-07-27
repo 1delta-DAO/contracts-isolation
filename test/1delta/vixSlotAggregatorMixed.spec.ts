@@ -20,7 +20,9 @@ import {
     VixInitializeAggregator,
     AggregatorCallback,
     AggregatorCallback__factory,
-    VixInitializeAggregator__factory
+    VixInitializeAggregator__factory,
+    FeeOperator,
+    FeeOperator__factory
 } from '../../types';
 import { BigNumber, constants } from 'ethers';
 import { expandTo18Decimals } from '../uniswap-v3/core/shared/utilities';
@@ -47,6 +49,7 @@ const toNumber = (n: BigNumber | string) => {
 // Tests all configurations for the minimal slot variant
 describe('Diamond Slot aggregation trading via data provider', async () => {
     let deployer: SignerWithAddress, alice: SignerWithAddress, bob: SignerWithAddress, carol: SignerWithAddress;
+    let partner: SignerWithAddress
     let compoundFixture: CompoundFixture
     let opts: CompoundOptions
     let uniswap: UniswapMinimalFixtureNoTokens
@@ -61,9 +64,11 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
     let dataProvider: DataProvider
     let initializer: VixInitializeAggregator
     let direct: VixDirect
+    let feeOperator: FeeOperator
+    let defaultFee: BigNumber
 
     before('get wallets and fixture', async () => {
-        [deployer, alice, bob, carol] = await ethers.getSigners();
+        [deployer, alice, bob, carol, partner] = await ethers.getSigners();
         tokenData = await tokenFixture(deployer, 6)
         algebra = await algebraFixture(deployer, tokenData.wnative.address)
         uniswap = await uniswapMinimalFixtureNoTokens(deployer, tokenData.wnative.address)
@@ -79,7 +84,7 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
             closeFactor: ONE_18
         }
         dataProvider = await new DataProvider__factory(deployer).deploy()
-
+        defaultFee = BigNumber.from(10)
         await tokenData.wnative.connect(deployer).deposit({ value: expandTo18Decimals(1_500) })
         // approve & fund wallets
         for (const token of tokenData.tokens) {
@@ -105,7 +110,6 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
             await token.connect(bob).approve(algebra.router.address, constants.MaxUint256)
             await token.connect(carol).approve(algebra.router.address, constants.MaxUint256)
             await token.connect(alice).approve(algebra.router.address, constants.MaxUint256)
-
         }
 
         compoundFixture = await generateCompoundFixture(deployer, opts, true)
@@ -119,6 +123,8 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
         await dataProvider.setOEther(compoundFixture.cEther.address)
 
         lens = await new OVixLensZK__factory(deployer).deploy()
+        feeOperator = await new FeeOperator__factory(deployer).deploy()
+        await feeOperator.setProtocolShare(5000)
 
         moduleProvider = await new DeltaModuleProvider__factory(deployer).deploy()
 
@@ -132,7 +138,8 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
             algebra.poolDeployer.address,
             uniswap.factory.address,
             dataProvider.address,
-            tokenData.wnative.address
+            tokenData.wnative.address,
+            feeOperator.address
         )
         direct = await new VixDirect__factory(deployer).deploy(
             dataProvider.address,
@@ -364,6 +371,8 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
             borrowAmount: swapAmount,
             minimumMarginReceived: swapAmount.mul(99).div(100),
             swapPath: swapPath,
+            partner: partner.address,
+            fee: defaultFee,
             marginPath: path
         }
 
@@ -422,6 +431,8 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
             borrowAmount: swapAmount,
             minimumMarginReceived: swapAmount.mul(99).div(100),
             swapPath: swapPath,
+            partner: partner.address,
+            fee: defaultFee,
             marginPath: path,
             permit: sig
         }
@@ -462,6 +473,8 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
             borrowAmount: swapAmount,
             minimumMarginReceived: swapAmount.mul(99).div(100),
             swapPath: swapPath,
+            partner: partner.address,
+            fee: defaultFee,
             marginPath: path
         }
 
@@ -571,6 +584,8 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
             borrowAmount: swapAmount,
             minimumMarginReceived: swapAmount.mul(95).div(100),
             swapPath: swapPath,
+            partner: partner.address,
+            fee: defaultFee,
             marginPath: path
         }
 
@@ -638,6 +653,8 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
             borrowAmount: swapAmount,
             minimumMarginReceived: swapAmount.mul(95).div(100),
             swapPath: swapPath,
+            partner: partner.address,
+            fee: defaultFee,
             marginPath: path,
             permit: sig
         }
@@ -682,6 +699,8 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
             borrowAmount: swapAmount,
             minimumMarginReceived: swapAmount.mul(95).div(100),
             swapPath: swapPath,
+            partner: partner.address,
+            fee: defaultFee,
             marginPath: path
         }
 
@@ -726,6 +745,8 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
             borrowAmount: swapAmount,
             minimumMarginReceived: swapAmount.mul(95).div(100),
             swapPath: swapPath,
+            partner: partner.address,
+            fee: defaultFee,
             marginPath: path
         }
 
@@ -773,6 +794,8 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
             borrowAmount: swapAmount,
             minimumMarginReceived: swapAmount.mul(95).div(100),
             swapPath: swapPath,
+            partner: partner.address,
+            fee: defaultFee,
             marginPath: path
         }
 
@@ -813,6 +836,8 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
             borrowAmount: swapAmount,
             minimumMarginReceived: swapAmount.mul(95).div(100),
             swapPath: swapPath,
+            partner: partner.address,
+            fee: defaultFee,
             marginPath: path
         }
 
@@ -879,6 +904,8 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
             borrowAmount: swapAmount,
             minimumMarginReceived: swapAmount.mul(95).div(100),
             swapPath: swapPath,
+            partner: partner.address,
+            fee: defaultFee,
             marginPath: path
         }
 
@@ -934,6 +961,8 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
             borrowAmount: swapAmount,
             minimumMarginReceived: swapAmount.mul(94).div(100),
             swapPath: swapPath,
+            partner: partner.address,
+            fee: defaultFee,
             marginPath: path
         }
 
@@ -1001,6 +1030,8 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
             borrowAmount: swapAmount,
             minimumMarginReceived: swapAmount.mul(95).div(100),
             swapPath: swapPath,
+            partner: partner.address,
+            fee: defaultFee,
             marginPath: path
         }
 
@@ -1069,6 +1100,8 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
             borrowAmount: swapAmount,
             minimumMarginReceived: swapAmount.mul(95).div(100),
             swapPath: swapPath,
+            partner: partner.address,
+            fee: defaultFee,
             marginPath: path
         }
 
@@ -1114,6 +1147,8 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
             borrowAmount: swapAmount,
             minimumMarginReceived: swapAmount.mul(95).div(100),
             swapPath: swapPath,
+            partner: partner.address,
+            fee: defaultFee,
             marginPath: path
         }
 
@@ -1182,6 +1217,8 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
             borrowAmount: swapAmount,
             minimumMarginReceived: swapAmount.mul(95).div(100),
             swapPath: swapPath,
+            partner: partner.address,
+            fee: defaultFee,
             marginPath: path
         }
 
@@ -1294,3 +1331,7 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
 // |  AggregationSlotFactory                                                  ·  createSlotWithPermit                    ·    1098133  ·    1160384  ·  1129259  ·            2  ·      71.52  │
 // ···········································································|··········································|·············|·············|···········|···············|··············
 
+// w fee
+// ···········································································|··········································|·············|·············|···········|···············|··············
+// |  VixSlotFactory                                                          ·  createSlot                              ·     872481  ·    1215243  ·  1026429  ·           13  ·      47.70  │
+// ···········································································|··········································|·············|·············|···········|···············|··············

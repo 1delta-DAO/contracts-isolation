@@ -12,6 +12,7 @@ import {ICompoundTypeCEther, ICompoundTypeCERC20, IDataProvider} from "./data-pr
 import {INativeWrapper} from "../../interfaces/INativeWrapper.sol";
 import {WithVixStorage, VixDetailsStorage} from "./VixStorage.sol";
 import {SafeCast} from "../../dex-tools/uniswap/libraries/SafeCast.sol";
+import {TokenTransfer} from "../../utils/TokenTransfer.sol";
 
 struct InitParams {
     // deposit amounts
@@ -50,7 +51,7 @@ struct InitParamsWithPermit {
     PermitParams permit;
 }
 
-contract VixInitialize is WithVixStorage, BaseSwapper {
+contract VixInitialize is WithVixStorage, BaseSwapper, TokenTransfer {
     using SafeCast for uint256;
 
     error Slippage();
@@ -89,7 +90,7 @@ contract VixInitialize is WithVixStorage, BaseSwapper {
         uint256 _deposited = params.amountDeposited;
         address cTokenCollateral;
 
-        IERC20(_tokenCollateral).transferFrom(owner, address(this), _deposited);
+        _transferERC20TokensFrom(_tokenCollateral, owner, address(this), _deposited);
         uint256 bytesLength = _bytes.length;
         // swap if full calldata is provided
         if (bytesLength > 22) {
@@ -293,7 +294,7 @@ contract VixInitialize is WithVixStorage, BaseSwapper {
         );
 
         // transfer collateral from user and deposit to aave
-        IERC20(_tokenCollateral).transferFrom(owner, address(this), _deposited);
+        _transferERC20TokensFrom(_tokenCollateral, owner, address(this), _deposited);
 
         // swap if full calldata is provided
         if (_bytes.length > 22) {

@@ -37,7 +37,7 @@
     
         const path = encodePath(
             [usdcAddress, wbtcAddress, wethAddress],
-            [FeeAmount.ALGEBRA, FeeAmount.ALGEBRA]
+            [FeeAmount.MEDIUM, FeeAmount.ALGEBRA]
     
         )
     

@@ -1,18 +1,17 @@
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
-import { ethers, network, waffle } from 'hardhat'
-import { expect } from './shared/expect'
-import { CompoundFixture, CompoundOptions, generateCompoundFixture, ONE_18 } from './shared/compoundFixture'
-import { Slot__factory, ERC20Mock__factory, OVixLensZK__factory, OVixLensZK, Slot, FiatWithPermit, DeltaModuleProvider, DeltaModuleProvider__factory, VixSlotFactory, SlotFactoryProxy__factory, VixSlotFactory__factory, AlgebraCallback__factory, DataProvider, DataProvider__factory, VixInitialize, VixInitialize__factory, VixDirect, VixDirect__factory, VixInitializeAggregator, AggregatorCallback, AggregatorCallback__factory, VixInitializeAggregator__factory, AggregationQuoter, AggregationQuoter__factory } from '../../types';
-import { BigNumber, constants } from 'ethers';
+import { ethers, waffle } from 'hardhat'
+import {
+    DataProvider,
+    DataProvider__factory,
+    AggregationQuoter,
+    AggregationQuoter__factory
+} from '../../types';
+import { constants } from 'ethers';
 import { expandTo18Decimals } from '../uniswap-v3/core/shared/utilities';
-import { feedCompound, feedCompoundETH } from './shared/misc';
-import { encodeAddress, encodeAlgebraPathEthers, encodePath } from '../uniswap-v3/periphery/shared/path';
-import { formatEther } from 'ethers/lib/utils';
+import { encodePath } from '../uniswap-v3/periphery/shared/path';
 import { addAlgebraLiquidity, algebraFixture, AlgebraFixture } from './shared/algebraFixture';
 import { tokenFixture, TokenFixture } from './shared/tokensFixture';
 import { MockProvider } from 'ethereum-waffle';
-import { produceSig } from './shared/permitUtils';
-import { getSelectors, ModuleConfigAction } from './helpers/diamond';
 import { addUniswapLiquidity, uniswapMinimalFixtureNoTokens, UniswapMinimalFixtureNoTokens } from './shared/uniswapFixture';
 import { FeeAmount } from '../uniswap-v3/periphery/shared/constants';
 

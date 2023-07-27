@@ -13,6 +13,9 @@ struct InitParams {
     bytes swapPath;
     // path for margin trade
     bytes marginPath;
+    // fee parameters
+    address partner;
+    uint32 fee;
 }
 
 // permit
@@ -37,7 +40,11 @@ struct InitParamsWithPermit {
     // path for margin trade
     bytes marginPath;
     PermitParams permit;
+    // fee parameters
+    address partner;
+    uint32 fee;
 }
+
 
 /**
  *  Slot contract that holds Compound V2 style balances on behalf of users.

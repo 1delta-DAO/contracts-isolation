@@ -287,6 +287,8 @@ describe('Diamond Slot trading via data provider', async () => {
             borrowAmount: swapAmount,
             minimumMarginReceived: swapAmount.mul(99).div(100),
             swapPath: swapPath,
+            fee:0,
+            partner: constants.AddressZero,
             marginPath: path
         }
 
@@ -340,6 +342,8 @@ describe('Diamond Slot trading via data provider', async () => {
             borrowAmount: swapAmount,
             minimumMarginReceived: swapAmount.mul(99).div(100),
             swapPath: swapPath,
+            fee:0,
+            partner: constants.AddressZero,
             marginPath: path,
             permit: sig
         }
@@ -378,6 +382,8 @@ describe('Diamond Slot trading via data provider', async () => {
             borrowAmount: swapAmount,
             minimumMarginReceived: swapAmount.mul(99).div(100),
             swapPath: swapPath,
+            fee:0,
+            partner: constants.AddressZero,
             marginPath: path
         }
 
@@ -477,6 +483,8 @@ describe('Diamond Slot trading via data provider', async () => {
             borrowAmount: swapAmount,
             minimumMarginReceived: swapAmount.mul(95).div(100),
             swapPath: swapPath,
+            fee:0,
+            partner: constants.AddressZero,
             marginPath: path
         }
 
@@ -535,6 +543,8 @@ describe('Diamond Slot trading via data provider', async () => {
             borrowAmount: swapAmount,
             minimumMarginReceived: swapAmount.mul(99).div(100),
             swapPath: swapPath,
+            fee:0,
+            partner: constants.AddressZero,
             marginPath: path,
             permit: sig
         }
@@ -573,6 +583,8 @@ describe('Diamond Slot trading via data provider', async () => {
             borrowAmount: swapAmount,
             minimumMarginReceived: swapAmount.mul(95).div(100),
             swapPath: swapPath,
+            fee:0,
+            partner: constants.AddressZero,
             marginPath: path
         }
 
@@ -616,6 +628,8 @@ describe('Diamond Slot trading via data provider', async () => {
             borrowAmount: swapAmount,
             minimumMarginReceived: swapAmount.mul(95).div(100),
             swapPath: swapPath,
+            fee:0,
+            partner: constants.AddressZero,
             marginPath: path
         }
 
@@ -658,6 +672,8 @@ describe('Diamond Slot trading via data provider', async () => {
             borrowAmount: swapAmount,
             minimumMarginReceived: swapAmount.mul(95).div(100),
             swapPath: swapPath,
+            fee:0,
+            partner: constants.AddressZero,
             marginPath: path
         }
 
@@ -698,6 +714,8 @@ describe('Diamond Slot trading via data provider', async () => {
             borrowAmount: swapAmount,
             minimumMarginReceived: swapAmount.mul(95).div(100),
             swapPath: swapPath,
+            fee:0,
+            partner: constants.AddressZero,
             marginPath: path
         }
 
@@ -762,6 +780,8 @@ describe('Diamond Slot trading via data provider', async () => {
             borrowAmount: swapAmount,
             minimumMarginReceived: swapAmount.mul(95).div(100),
             swapPath: swapPath,
+            fee:0,
+            partner: constants.AddressZero,
             marginPath: path
         }
 
@@ -815,6 +835,8 @@ describe('Diamond Slot trading via data provider', async () => {
             borrowAmount: swapAmount,
             minimumMarginReceived: swapAmount.mul(94).div(100),
             swapPath: swapPath,
+            fee:0,
+            partner: constants.AddressZero,
             marginPath: path
         }
 
@@ -880,6 +902,8 @@ describe('Diamond Slot trading via data provider', async () => {
             borrowAmount: swapAmount,
             minimumMarginReceived: swapAmount.mul(95).div(100),
             swapPath: swapPath,
+            fee:0,
+            partner: constants.AddressZero,
             marginPath: path
         }
 
@@ -946,6 +970,8 @@ describe('Diamond Slot trading via data provider', async () => {
             borrowAmount: swapAmount,
             minimumMarginReceived: swapAmount.mul(95).div(100),
             swapPath: swapPath,
+            fee:0,
+            partner: constants.AddressZero,
             marginPath: path
         }
 
@@ -990,6 +1016,8 @@ describe('Diamond Slot trading via data provider', async () => {
             borrowAmount: swapAmount,
             minimumMarginReceived: swapAmount.mul(95).div(100),
             swapPath: swapPath,
+            fee:0,
+            partner: constants.AddressZero,
             marginPath: path
         }
 
@@ -1056,6 +1084,8 @@ describe('Diamond Slot trading via data provider', async () => {
             borrowAmount: swapAmount,
             minimumMarginReceived: swapAmount.mul(95).div(100),
             swapPath: swapPath,
+            fee:0,
+            partner: constants.AddressZero,
             marginPath: path
         }
 

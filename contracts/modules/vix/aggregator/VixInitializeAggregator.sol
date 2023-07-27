@@ -12,6 +12,7 @@ import {ICompoundTypeCEther, ICompoundTypeCERC20, IDataProvider} from "../data-p
 import {INativeWrapper} from "../../../interfaces/INativeWrapper.sol";
 import {WithVixStorage, VixDetailsStorage} from "../VixStorage.sol";
 import {SafeCast} from "../../../dex-tools/uniswap/libraries/SafeCast.sol";
+import {FeeTransfer} from "../fees/FeeTransfer.sol";
 
 struct InitParams {
     // deposit amounts
@@ -24,6 +25,9 @@ struct InitParams {
     bytes swapPath;
     // path for margin trade
     bytes marginPath;
+    // fee parameters
+    address partner;
+    uint32 fee;
 }
 
 // permit
@@ -48,9 +52,12 @@ struct InitParamsWithPermit {
     // path for margin trade
     bytes marginPath;
     PermitParams permit;
+    // fee parameters
+    address partner;
+    uint32 fee;
 }
 
-contract VixInitializeAggregator is WithVixStorage, BaseAggregator {
+contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer {
     using SafeCast for uint256;
 
     error Slippage();
@@ -65,8 +72,9 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator {
         address _algebraDeployer,
         address _doveFactory,
         address _dataProvider,
-        address _weth
-    ) BaseAggregator(_algebraDeployer, _doveFactory) {
+        address _weth,
+        address _feeCollector
+    ) BaseAggregator(_algebraDeployer, _doveFactory) FeeTransfer(_feeCollector) {
         FACTORY = msg.sender;
         DATA_PROVIDER = _dataProvider;
         NATIVE_WRAPPER = _weth;
@@ -90,7 +98,8 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator {
         uint256 _deposited = params.amountDeposited;
         address cTokenCollateral;
 
-        IERC20(_tokenCollateral).transferFrom(owner, address(this), _deposited);
+        _transferERC20TokensFrom(_tokenCollateral, owner, address(this), _deposited);
+        _deposited = applyFeeAndTransfer(_tokenCollateral, _deposited, params.partner, params.fee);
         uint256 bytesLength = _bytes.length;
         // swap if full calldata is provided
         if (bytesLength > 22) {
@@ -116,7 +125,7 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator {
                 ICompoundTypeCERC20(cTokenCollateral).mint(_deposited);
             }
         }
-        // deposit cannot be Ether - hndled by other function
+        // deposit cannot be Ether - handled by other function
         else {
             cTokenCollateral = IDataProvider(DATA_PROVIDER).cToken(_tokenCollateral);
             // approve deposit token (can also be the collateral token)
@@ -157,7 +166,7 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator {
             _tokenCollateral := div(mload(add(add(_bytes, 0x20), 0)), 0x1000000000000000000000000)
         }
 
-        uint256 _deposited = msg.value;
+        uint256 _deposited = applyFeeAndTransferEther(msg.value, params.partner, params.fee);
         address cTokenCollateral;
         uint256 bytesLength = _bytes.length;
         // if a route is provided, wrap ether and swap
@@ -227,15 +236,9 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator {
             ? amountToRepay
             : ICompoundTypeCERC20(tokenOut == native ? IDataProvider(DATA_PROVIDER).cEther() : IDataProvider(DATA_PROVIDER).cToken(tokenOut))
                 .borrowBalanceCurrent(address(this));
-        
+
         bool zeroForOne = tokenIn < tokenOut;
-        _toPool(tokenIn, fee, tokenOut).swap(
-            address(this),
-            zeroForOne,
-            -amountOut.toInt256(),
-            zeroForOne ? MIN_SQRT_RATIO : MAX_SQRT_RATIO, 
-            path
-            );
+        _toPool(tokenIn, fee, tokenOut).swap(address(this), zeroForOne, -amountOut.toInt256(), zeroForOne ? MIN_SQRT_RATIO : MAX_SQRT_RATIO, path);
 
         // fetch amount in and clean cache
         amountIn = cs().amount;
@@ -304,7 +307,8 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator {
         );
 
         // transfer collateral from user and deposit to aave
-        IERC20(_tokenCollateral).transferFrom(owner, address(this), _deposited);
+        _transferERC20TokensFrom(_tokenCollateral, owner, address(this), _deposited);
+        _deposited = applyFeeAndTransfer(_tokenCollateral, _deposited, params.partner, params.fee);
 
         // swap if full calldata is provided
         if (_bytes.length > 22) {
