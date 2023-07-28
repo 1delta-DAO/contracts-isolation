@@ -108,22 +108,7 @@ contract VixSlotFactory is SlotFactoryStorage {
     function getSlotCount(address _user) external view returns (uint256) {
         return userSlots[_user].values().length;
     }
-
-    // Admin functions
-
-    /**
-     * Allows the admin to withdraw collected fees
-     */
-    function withdrawFees(address asset) external payable {
-        if (msg.sender != admin) revert OnlyAdmin();
-        address _asset = asset;
-        if (asset == address(0)) {
-            payable(admin).transfer(address(this).balance);
-        } else {
-            IERC20(_asset).transfer(admin, IERC20(_asset).balanceOf(address(this)));
-        }
-    }
-
+    
     /**
      * Allows the admin change to a new admin
      */

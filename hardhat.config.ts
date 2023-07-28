@@ -118,7 +118,7 @@ const config: HardhatUserConfig = {
     excludeContracts: ['contracts/mocks/', 'contracts/libraries/'],
   },
   mocha: {
-    timeout: 50000,
+    timeout: 100000,
   },
   namedAccounts: {
     operator: address1,

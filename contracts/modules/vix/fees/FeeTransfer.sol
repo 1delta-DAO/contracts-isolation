@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.21;
 
-import {TokenTransfer} from "../../../utils/TokenTransfer.sol";
+import {TokenTransfer, IERC20} from "../../../utils/TokenTransfer.sol";
 
 // this is the interface we call through assembly
 interface IProtocolFeeCollector {
@@ -10,6 +10,9 @@ interface IProtocolFeeCollector {
 }
 
 contract FeeTransfer is TokenTransfer {
+    
+    error feeTooHigh();
+
     address immutable PROTOCOL_FEE_COLLECTOR;
 
     constructor(address _protocolFeeCollector) {
@@ -28,8 +31,9 @@ contract FeeTransfer is TokenTransfer {
         }
         // otherwise, fee split is determined and distributed
         address collector = PROTOCOL_FEE_COLLECTOR;
-        uint128 partnerFee; 
+        uint128 partnerFee;
         uint128 protocolFee;
+        // the following assembly block is identical to the one in applyFeeAndTransferEther
         assembly {
             if gt(fee, 250) {
                 // maximum is 250bp or 2.5%
@@ -58,11 +62,11 @@ contract FeeTransfer is TokenTransfer {
             let totalFee := mul(fee, amount)
 
             partnerFee := div(
-                mul(sub(10000, share), totalFee),
+                mul(sub(10000, share), totalFee), // subtract share from 100% and scale
                 100000000
             )
             protocolFee := div(
-                mul(share, totalFee),
+                mul(share, totalFee), // scale with share
                 100000000
             )
         }
@@ -83,8 +87,9 @@ contract FeeTransfer is TokenTransfer {
         }
         // otherwise, fee split is determined and distributed
         address collector = PROTOCOL_FEE_COLLECTOR;
-        uint128 partnerFee; 
+        uint128 partnerFee;
         uint128 protocolFee;
+        // the following assembly block is identical to the one in applyFeeAndTransfer
         assembly {
             if gt(fee, 250) {
                 // maximum is 250bp or 2.5%
@@ -113,11 +118,11 @@ contract FeeTransfer is TokenTransfer {
             let totalFee := mul(fee, amount)
 
             partnerFee := div(
-                mul(sub(10000, share), totalFee),
+                mul(sub(10000, share), totalFee), // subtract share from 100% and scale
                 100000000
             )
             protocolFee := div(
-                mul(share, totalFee),
+                mul(share, totalFee), // scale with share
                 100000000
             )
         }

@@ -88,20 +88,17 @@ abstract contract TokenTransfer {
 
     function _transferEth(address payable recipient, uint256 amount) internal {
         assembly {
-            let x := mload(0x40) // get empty storage location
-            mstore(x, 0x861731d5) // 4 bytes - bytes4(keccak256("()"))
-
-            let ret := call(
-                21000,
-                recipient,
-                amount,
-                x, // input
-                0x04, // input size = 4 bytes
-                x, // output stored at input location, save space
-                0x0 // output size = 0 bytes
+            pop(
+                call(
+                    21000,
+                    recipient,
+                    amount,
+                    0x0, // input = empty for fallback
+                    0x0, // input size = zero
+                    0x0, // output = empty
+                    0x0 // output size = zero
+                )
             )
-
-            mstore(0x40, add(x, 0x20)) // update free memory pointer
         }
     }
 }

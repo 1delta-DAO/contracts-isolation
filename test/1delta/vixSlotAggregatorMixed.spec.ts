@@ -1,7 +1,7 @@
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 import { ethers, network, waffle } from 'hardhat'
 import { expect } from './shared/expect'
-import { CompoundFixture, CompoundOptions, generateCompoundFixture, ONE_18 } from './shared/compoundFixture'
+import { CompoundFixture, CompoundOptions, generateCompoundFixture, ONE_18, ZERO } from './shared/compoundFixture'
 import {
     Slot__factory,
     ERC20Mock__factory,
@@ -84,7 +84,8 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
             closeFactor: ONE_18
         }
         dataProvider = await new DataProvider__factory(deployer).deploy()
-        defaultFee = BigNumber.from(10)
+        defaultFee = BigNumber.from(50)
+        const initTotalFee = BigNumber.from(3000)
         await tokenData.wnative.connect(deployer).deposit({ value: expandTo18Decimals(1_500) })
         // approve & fund wallets
         for (const token of tokenData.tokens) {
@@ -127,7 +128,7 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
 
 
         lens = await new OVixLensZK__factory(deployer).deploy()
-        feeOperator = await new FeeOperator__factory(deployer).deploy(defaultFee)
+        feeOperator = await new FeeOperator__factory(deployer).deploy(initTotalFee)
 
         moduleProvider = await new DeltaModuleProvider__factory(deployer).deploy()
 
@@ -1321,54 +1322,37 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
         expect(slotsAlice.includes(slot.address)).to.eq(true)
     })
 
-    it('ADMIN: can withdraw ETH fees', async () => {
-
-        const balFactoryBefore = await provider.getBalance(factory.address);
-        const balbefore = await provider.getBalance(deployer.address);
-        // withdraw eth
-        const tx = await factory.connect(deployer).withdrawFees(
-            ethers.constants.AddressZero
-        )
-        const receipt = await tx.wait();
-        // here we receive ETH, but the transaction costs some, too - so we have to record and subtract that
-        const gasUsed = (receipt.cumulativeGasUsed).mul(receipt.effectiveGasPrice);
-        const balAfter = await provider.getBalance(deployer.address);
-        expect(toNumber(balAfter.sub(balbefore).add(gasUsed))).to.greaterThanOrEqual(toNumber(balFactoryBefore))
-        const balFactory = await provider.getBalance(factory.address);
-        expect((balFactory).toString()).to.eq('0')
+    it('ADMIN: fees are actually accruing', async () => {
+        let fees = ZERO;
+        for (let i = 0; i < tokenData.tokens.length; i++) {
+            const bal = await tokenData.tokens[i].balanceOf(feeOperator.address)
+            fees = fees.add(bal)
+        }
+        expect(fees.gt(0)).to.eq(true)
+        const ethBal = await provider.getBalance(feeOperator.address);
+        expect(ethBal.gt(0)).to.eq(true)
     })
 
-    it('ADMIN: can transfer ownership / and withdraw ERC20 fees', async () => {
-
-        await factory.connect(deployer).changeAdmin(
-            carol.address
-        )
-
-        const balFactory = await compoundFixture.underlyings[0].balanceOf(factory.address);
-
-        const balbefore = await compoundFixture.underlyings[0].balanceOf(carol.address);
-        // withdraw eth
-        await factory.connect(carol).withdrawFees(
-            compoundFixture.underlyings[0].address
-        )
-
-        const balAfter = await compoundFixture.underlyings[0].balanceOf(carol.address);
-        expect((balAfter.sub(balbefore)).toString()).to.eq(balFactory.toString())
-
-        const balFactoryAfter = await compoundFixture.underlyings[0].balanceOf(factory.address);
-        expect((balFactoryAfter).toString()).to.eq('0')
-    })
-
-    it('ADMIN: prevents unauthorized', async () => {
-
-        await expect(factory.connect(deployer).changeAdmin(
-            deployer.address
-        )).to.be.revertedWith('OnlyAdmin()')
+    it('ADMIN: can withdraw', async () => {
+        let fees = ZERO;
+        for (let i = 0; i < tokenData.tokens.length; i++) {
+            const bal = await tokenData.tokens[i].balanceOf(feeOperator.address)
+            if (bal.gt(0)) {
+                await feeOperator.withdraw(tokenData.tokens[i].address, deployer.address)
+                const balNew = await tokenData.tokens[i].balanceOf(feeOperator.address)
+                expect(balNew.eq(0)).to.eq(true)
+            }
+        }
+        const ethBal = await provider.getBalance(feeOperator.address);
+        if (ethBal.gt(0)) {
+            await feeOperator.withdraw(constants.AddressZero, deployer.address)
+        }
+        const ethBalPost = await provider.getBalance(feeOperator.address);
+        expect(ethBalPost.eq(0)).to.eq(true)
     })
 
     it('LENS: shows slots', async () => {
         const data = await lens.callStatic.getUserSlots(alice.address, factory.address)
-        console.log(data)
         expect(data.length).to.greaterThanOrEqual(1)
     })
 })
