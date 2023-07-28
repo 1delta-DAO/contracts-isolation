@@ -43,6 +43,7 @@ contract VixSlotFactory is SlotFactoryStorage {
         dataProvider = _dataProvider;
         initialized = true;
     }
+
     /**
      * create a slot
      * - deposits collateral in collateral currency
@@ -133,5 +134,23 @@ contract VixSlotFactory is SlotFactoryStorage {
 
     function getmoduleProvider() external view returns (address) {
         return moduleProvider;
+    }
+
+    /**
+     * Register the change of ownership in the factory.
+     * Can only be called by a slot through the user.
+     */
+    function registerChange(
+        address owner,
+        address newOwner
+    ) external {
+        address _owner = owner; // save gas
+        // makes sure that a slot is the caller
+        address slot = msg.sender;
+        // remove from original owner 
+        // -> the call would return false if the slot was not contained
+        require(userSlots[_owner].remove(slot), "Slot not contained");
+        // addd to new owner
+        userSlots[newOwner].add(slot);
     }
 }

@@ -124,6 +124,8 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
         await dataProvider.setComptroller(compoundFixture.comptroller.address)
         await dataProvider.setOEther(compoundFixture.cEther.address)
 
+        const factoryProxy = await new SlotFactoryProxy__factory(deployer).deploy()
+
         lens = await new OVixLensZK__factory(deployer).deploy()
         feeOperator = await new FeeOperator__factory(deployer).deploy(defaultFee)
 
@@ -144,7 +146,8 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
         )
         direct = await new VixDirect__factory(deployer).deploy(
             dataProvider.address,
-            tokenData.wnative.address
+            tokenData.wnative.address,
+            factoryProxy.address
         )
 
         await moduleProvider.configureModules(
@@ -168,7 +171,6 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
         )
 
 
-        const factoryProxy = await new SlotFactoryProxy__factory(deployer).deploy()
 
         factoryImplementation = await new VixSlotFactory__factory(deployer).deploy()
 

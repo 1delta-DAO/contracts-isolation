@@ -122,6 +122,10 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
         await dataProvider.setComptroller(compoundFixture.comptroller.address)
         await dataProvider.setOEther(compoundFixture.cEther.address)
 
+
+        const factoryProxy = await new SlotFactoryProxy__factory(deployer).deploy()
+
+
         lens = await new OVixLensZK__factory(deployer).deploy()
         feeOperator = await new FeeOperator__factory(deployer).deploy(defaultFee)
 
@@ -142,7 +146,9 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
         )
         direct = await new VixDirect__factory(deployer).deploy(
             dataProvider.address,
-            tokenData.wnative.address
+            tokenData.wnative.address,
+            factoryProxy.address
+
         )
 
         await moduleProvider.configureModules(
@@ -165,8 +171,6 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
             ]
         )
 
-
-        const factoryProxy = await new SlotFactoryProxy__factory(deployer).deploy()
 
         factoryImplementation = await new VixSlotFactory__factory(deployer).deploy()
 
@@ -1263,6 +1267,60 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
         expect(toNumber(balAfter.sub(balBefore).mul(101).div(100))).to.greaterThanOrEqual(toNumber(depositAmount))
     })
 
+
+    it('TRANSFER: can transfer a slot', async () => {
+
+        const inIndex = 1
+        const depositAmount = expandTo18Decimals(10)
+        const swapAmount = expandTo18Decimals(4)
+
+        const path = encodeAlgebraPathEthers(
+            [tokenData.wnative.address, tokenData.tokens[0].address, tokenData.tokens[1].address],
+            [FeeAmount.ALGEBRA, FeeAmount.ALGEBRA],
+            [0, 3],
+            0
+        )
+
+        const swapPath = encodeAddress(tokenData.tokens[1].address)
+
+        const params = {
+            amountDeposited: depositAmount,
+            minimumAmountDeposited: depositAmount.mul(95).div(100),
+            borrowAmount: swapAmount,
+            minimumMarginReceived: swapAmount.mul(95).div(100),
+            swapPath: swapPath,
+            partner: partner.address,
+            fee: defaultFee,
+            marginPath: path
+        }
+
+        // approve
+        const projAddress = await factory.getNextAddress(bob.address)
+        await approve(bob, compoundFixture.underlyings[inIndex].address, projAddress)
+
+        // create
+        await factory.connect(bob).createSlot(
+            params
+        )
+
+        const borrowPost = await compoundFixture.cEther.callStatic.borrowBalanceCurrent(projAddress)
+        const supplyPost = await compoundFixture.cTokens[inIndex].callStatic.balanceOfUnderlying(projAddress)
+
+        expect(borrowPost.toString()).to.equal(swapAmount.toString())
+        expect(toNumber(supplyPost)).to.greaterThan(toNumber(params.minimumMarginReceived.add(depositAmount)))
+
+
+        const slot = await VixDirect__factory.connect(projAddress, bob)
+
+        await slot.transferSlot(alice.address)
+        const newOwner = await slot.getOwner()
+        expect(newOwner).to.equal(alice.address)
+        const slotsAlice = await factory.getSlots(alice.address)
+        const slotsBob = await factory.getSlots(bob.address)
+        expect(!slotsBob.includes(slot.address)).to.eq(true)
+        expect(slotsAlice.includes(slot.address)).to.eq(true)
+    })
+
     it('ADMIN: can withdraw ETH fees', async () => {
 
         const balFactoryBefore = await provider.getBalance(factory.address);
@@ -1332,5 +1390,7 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
 
 // w fee
 // ···········································································|··········································|·············|·············|···········|···············|··············
-// |  VixSlotFactory                                                          ·  createSlot                              ·     872481  ·    1215243  ·  1026429  ·           13  ·      47.70  │
+// |  VixSlotFactory                                                          ·  createSlot                              ·     869466  ·    1212233  ·  1023587  ·           13  ·      67.03  │
+// ···········································································|··········································|·············|·············|···········|···············|··············
+// |  VixSlotFactory                                                          ·  createSlotWithPermit                    ·    1066040  ·    1172703  ·  1119372  ·            2  ·      73.31  │
 // ···········································································|··········································|·············|·············|···········|···············|··············

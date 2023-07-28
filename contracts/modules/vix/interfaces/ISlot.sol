@@ -45,7 +45,6 @@ struct InitParamsWithPermit {
     uint32 fee;
 }
 
-
 /**
  *  Slot contract that holds Compound V2 style balances on behalf of users.
  */
@@ -65,4 +64,6 @@ interface ISlot {
     function repay(uint256 amount) external payable;
 
     function withdraw(uint256 amount, bool useCTokens) external payable;
+
+    function getOwner() external view returns (address);
 }

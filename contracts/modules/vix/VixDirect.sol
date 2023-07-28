@@ -11,6 +11,7 @@ import {WithVixStorage} from "./VixStorage.sol";
 import {IERC20} from "../../external-protocols/openzeppelin/token/ERC20/IERC20.sol";
 import {ICompoundTypeCEther, ICompoundTypeCERC20, IDataProvider} from "./data-provider/IDataProvider.sol";
 import {TokenTransfer} from "../../utils/TokenTransfer.sol";
+import {IFactory} from "./interfaces/IFactory.sol";
 
 contract VixDirect is WithVixStorage, TokenTransfer {
     using SafeCast for uint256;
@@ -20,10 +21,16 @@ contract VixDirect is WithVixStorage, TokenTransfer {
 
     address private immutable DATA_PROVIDER;
     address private immutable NATIVE_WRAPPER;
+    address private immutable SLOT_FACTORY;
 
-    constructor(address _dataProvider, address _weth) {
+    constructor(
+        address _dataProvider,
+        address _weth,
+        address _slotFactory
+    ) {
         DATA_PROVIDER = _dataProvider;
         NATIVE_WRAPPER = _weth;
+        SLOT_FACTORY = _slotFactory;
     }
 
     /**
@@ -107,12 +114,11 @@ contract VixDirect is WithVixStorage, TokenTransfer {
     }
 
     /**
-     * Transfer a token from the position to the owner - can only be called by owner
+     * Transfer a token from the position to the owner - can only be called by owner and multicall
      */
     function sweepTokens(address asset) external payable {
-        // efficient OnlyOwner() check
         address owner = ads().owner;
-        require(msg.sender == owner, "OnlyOwner()");
+        require(msg.sender == owner || msg.sender == address(this), "OnlyOwner()");
         address _asset = asset;
         if (_asset == address(0)) {
             uint256 balance = address(this).balance;
@@ -121,5 +127,19 @@ contract VixDirect is WithVixStorage, TokenTransfer {
             uint256 balance = IERC20(_asset).balanceOf(address(this));
             if (balance > 0) _transferERC20Tokens(_asset, owner, balance);
         }
+    }
+
+    /**
+     * Changes the ownership of the slot and registers it in the factory
+     */
+    function transferSlot(address recipient) external {
+        address owner = ads().owner;
+        require(msg.sender == owner, "OnlyOwner()");
+        IFactory(SLOT_FACTORY).registerChange(owner, recipient);
+        ads().owner = recipient;
+    }
+
+    function getOwner() external view returns (address) {
+        return ads().owner;
     }
 }

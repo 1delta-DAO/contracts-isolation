@@ -47,7 +47,7 @@ contract FeeTransfer is TokenTransfer {
             mstore(params, 0x7161854700000000000000000000000000000000000000000000000000000000)
 
             // call to feeOperator
-            let success := staticcall(4000, collector, params, 0x24, params, 0x20)
+            let success := staticcall(5000, collector, params, 0x24, params, 0x20)
 
             if iszero(success) {
                 revert(params, 0x40)
@@ -102,7 +102,7 @@ contract FeeTransfer is TokenTransfer {
             mstore(params, 0x7161854700000000000000000000000000000000000000000000000000000000)
 
             // call to feeOperator
-            let success := staticcall(4000, collector, params, 0x24, params, 0x20)
+            let success := staticcall(5000, collector, params, 0x24, params, 0x20)
 
             if iszero(success) {
                 revert(params, 0x40)
