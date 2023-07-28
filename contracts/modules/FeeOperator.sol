@@ -42,7 +42,7 @@ contract FeeOperator is Ownable, TokenTransfer {
      * the limit range.
      * @param _newShare the new protocol fee share value to ramp towards
      */
-    function changeShare(uint256 _newShare) external {
+    function changeShare(uint256 _newShare) external onlyOwner {
         uint256 newShare = _newShare;
         if (block.timestamp < _lastChangeTime + MIN_RAMP_TIME) revert changeTooEarly();
         if (newShare > MAX_SHARE) revert changeOutOfBounds();
