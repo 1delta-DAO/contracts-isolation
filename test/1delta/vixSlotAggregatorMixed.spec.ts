@@ -397,7 +397,7 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
     })
 
 
-    it.only('GENERAL: prevents using a too high fee', async () => {
+    it('GENERAL: prevents using a too high fee', async () => {
 
         const inIndex = 0
         const routeIndexes = [3, 2, 1, 0]
