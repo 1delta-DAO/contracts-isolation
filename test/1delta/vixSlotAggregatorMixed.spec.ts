@@ -396,6 +396,45 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
         expect(toNumber(supplyPost)).to.greaterThan(toNumber(params.minimumMarginReceived))
     })
 
+
+    it.only('GENERAL: prevents using a too high fee', async () => {
+
+        const inIndex = 0
+        const routeIndexes = [3, 2, 1, 0]
+        const depositAmount = expandTo18Decimals(100)
+        const swapAmount = expandTo18Decimals(50)
+
+        let _tokensInRoute = routeIndexes.map(t => compoundFixture.underlyings[t].address)
+        const path = encodeAlgebraPathEthers(
+            _tokensInRoute,
+            new Array(_tokensInRoute.length - 1).fill(FeeAmount.MEDIUM),
+            [0, 3, 3],
+            0
+        )
+
+        const swapPath = encodeAddress(compoundFixture.underlyings[inIndex].address)
+
+        const params = {
+            amountDeposited: depositAmount,
+            minimumAmountDeposited: depositAmount.mul(95).div(100),
+            borrowAmount: swapAmount,
+            minimumMarginReceived: swapAmount.mul(99).div(100),
+            swapPath: swapPath,
+            partner: partner.address,
+            fee: 500, // 5%
+            marginPath: path
+        }
+
+        // approve
+        const projAddress = await factory.getNextAddress(alice.address)
+        await approve(alice, compoundFixture.underlyings[inIndex].address, projAddress)
+
+        // create
+        await expect(factory.connect(alice).createSlot(
+            params
+        )).to.be.revertedWith("feeTooHigh()")
+    })
+
     it('SINGLE PERMIT: allows to deploy standard slot', async () => {
 
         const inIndex = 0

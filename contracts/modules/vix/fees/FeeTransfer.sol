@@ -10,7 +10,7 @@ interface IProtocolFeeCollector {
 }
 
 contract FeeTransfer is TokenTransfer {
-    
+    // this error is called through assembly
     error feeTooHigh();
 
     address immutable PROTOCOL_FEE_COLLECTOR;
@@ -37,7 +37,7 @@ contract FeeTransfer is TokenTransfer {
         assembly {
             if gt(fee, 250) {
                 // maximum is 250bp or 2.5%
-                mstore(0, 0x927dd1a7)
+                mstore(0, 0x927dd1a700000000000000000000000000000000000000000000000000000000)
                 revert(0, 4) // revert with feeTooHigh()
             }
 
@@ -93,7 +93,7 @@ contract FeeTransfer is TokenTransfer {
         assembly {
             if gt(fee, 250) {
                 // maximum is 250bp or 2.5%
-                mstore(0, 0x927dd1a7)
+                mstore(0, 0x927dd1a700000000000000000000000000000000000000000000000000000000)
                 revert(0, 4) // revert with feeTooHigh()
             }
 
