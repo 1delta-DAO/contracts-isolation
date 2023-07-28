@@ -45,7 +45,7 @@ contract FeeOperator is Ownable, TokenTransfer {
     function changeShare(uint256 _newShare) external {
         uint256 newShare = _newShare;
         if (block.timestamp < _lastChangeTime + MIN_RAMP_TIME) revert changeTooEarly();
-        if (0 == newShare || newShare > MAX_SHARE) revert changeOutOfBounds();
+        if (newShare > MAX_SHARE) revert changeOutOfBounds();
 
         uint256 _initiaShare = _protocolShare;
 
