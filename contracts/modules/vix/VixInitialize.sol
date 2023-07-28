@@ -372,4 +372,8 @@ contract VixInitialize is WithVixStorage, BaseSwapper, TokenTransfer {
     {
         return (FACTORY, 0, ds().creationTime, ds().closeTime);
     }
+
+    function getDetails() external pure returns (VixDetailsStorage memory details) {
+        return ds();
+    }
 }

@@ -6,37 +6,51 @@ import "../external-protocols/openzeppelin/access/Ownable.sol";
 import {TokenTransfer, IERC20} from "../utils/TokenTransfer.sol";
 
 contract FeeOperator is Ownable, TokenTransfer {
+    event ProtocolShareChanged(uint256 initialShare, uint256 futureShare, uint256 timestamp);
+
     error feeTooHigh();
-    uint256 public protocolShare;
 
-    constructor() Ownable() {}
+    // protocol fee share parameters
+    uint256 private _protocolShare;
+    uint256 _lastChangeTime;
 
-    // calculate fee split
-    // checks only that fee is not higher than 2.5%
-    // does not check for overflows - a check should occur when applying the fees to the amount
-    function getFeeSplit(uint256 amount, uint32 fee) external view returns (uint128 partnerFee, uint128 protocolFee) {
-        assembly {
-            if gt(fee, 250) {
-                // maximum is 250bp or 2.5%
-                mstore(0, 0x927dd1a7)
-                revert(0, 4) // revert with feeTooHigh()
-            }
-            let totalFee := mul(fee, amount)
-            let share := sload(protocolShare.slot)
-            partnerFee := div(
-                mul(sub(10000, share), totalFee),
-                100000000
-            )
-            protocolFee := div(
-                mul(share, totalFee),
-                100000000
-            )
-        }
+    uint256 internal constant MIN_RAMP_TIME = 1 days; // the time the operator has to wait until a new change
+    uint256 internal constant MAX_SHARE = 8000; // maximum fee percentage 10000 = 100%
+    uint256 internal constant MAX_SHARE_CHANGE = 100; // maximum change that can be applied in an interval of MIN_RAMP_TIME
+
+    constructor(uint256 share) Ownable() {
+        if (share > MAX_SHARE) revert feeTooHigh(); // 80% is the limit
+        _protocolShare = share;
+        _lastChangeTime = block.timestamp;
     }
 
-    function setProtocolShare(uint256 share) external onlyOwner {
-        require(share < 8000, "Share too high"); // 80% is the limit
-        protocolShare = share;
+    function getProtocolShare() external view returns (uint256) {
+        return _protocolShare;
+    }
+
+    /**
+     * @notice Start ramping up or down share parameter towards given futureShare_ and futureTime_
+     * Checks if the change is too rapid, and commits the new share value only when it falls under
+     * the limit range.
+     * @param _newShare the new A to ramp towards
+     */
+    function changeShare(uint256 _newShare) external {
+        uint256 newShare = _newShare;
+        require(block.timestamp >= _lastChangeTime + MIN_RAMP_TIME, "Ramp period");
+        require(0 < newShare && newShare < MAX_SHARE, "Share too high");
+
+        uint256 _initiaShare = _protocolShare;
+
+        if (newShare < _initiaShare) {
+            require(newShare > _initiaShare + MAX_SHARE_CHANGE, "Change too high");
+        } else {
+            require(newShare + MAX_SHARE_CHANGE < _initiaShare, "Change too high");
+        }
+
+        _protocolShare = newShare;
+        _lastChangeTime = block.timestamp;
+
+        emit ProtocolShareChanged(_initiaShare, newShare, block.timestamp);
     }
 
     function withdraw(address asset, address payable recipient) external onlyOwner {

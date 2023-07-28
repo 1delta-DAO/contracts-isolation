@@ -123,8 +123,7 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
         await dataProvider.setOEther(compoundFixture.cEther.address)
 
         lens = await new OVixLensZK__factory(deployer).deploy()
-        feeOperator = await new FeeOperator__factory(deployer).deploy()
-        await feeOperator.setProtocolShare(5000)
+        feeOperator = await new FeeOperator__factory(deployer).deploy(defaultFee)
 
         moduleProvider = await new DeltaModuleProvider__factory(deployer).deploy()
 
