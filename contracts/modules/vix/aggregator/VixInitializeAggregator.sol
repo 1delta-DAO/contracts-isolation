@@ -2,7 +2,6 @@
 
 pragma solidity ^0.8.21;
 
-/* solhint-disable no-inline-assembly */
 /* solhint-disable max-line-length */
 
 import {IERC20Permit} from "../../../external-protocols/openzeppelin/token/ERC20/extensions/IERC20Permit.sol";
@@ -43,7 +42,7 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer 
     }
 
     /**
-     * @dev Initializes with ERC20 deposit - can swap to WETH
+     * @dev Initializes with ERC20 deposit - can swap to WETH and deposit ETH
      */
     function initialize(address owner, InitParams calldata params) external payable virtual {
         VixDetailsStorage memory details = ds();
@@ -53,7 +52,7 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer 
         bytes memory _bytes = params.swapPath;
         address _tokenCollateral;
         details.creationTime = uint32(block.timestamp % 2**32);
-        // fetch token and flag for more data
+        // fetch token
         assembly {
             _tokenCollateral := div(mload(add(add(_bytes, 0x20), 0)), 0x1000000000000000000000000)
         }
@@ -125,7 +124,7 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer 
         address _tokenCollateral;
         details.creationTime = uint32(block.timestamp % 2**32);
 
-        // fetch token and flag for more data
+        // fetch token
         assembly {
             _tokenCollateral := div(mload(add(add(_bytes, 0x20), 0)), 0x1000000000000000000000000)
         }
@@ -185,7 +184,7 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer 
         address _tokenCollateral;
         details.creationTime = uint32(block.timestamp % 2**32);
 
-        // fetch token and flag for more data
+        // fetch token
         assembly {
             _tokenCollateral := div(mload(add(add(_bytes, 0x20), 0)), 0x1000000000000000000000000)
         }
@@ -320,41 +319,6 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer 
                 _transferERC20Tokens(collateral, owner, withdrawAmount);
             }
         }
-    }
-
-    /**
-     * @dev Liquidate debt with exact input swap. If amountIn = 0, the whole collateral will be used.
-     *  Input token can either be the collateral token or the deposit token
-     */
-    function liquidatePosition(
-        uint128 amountIn,
-        uint128 amountOutMinimum,
-        bytes memory path
-    ) public virtual returns (uint128 amountOut) {
-        require(msg.sender == ads().owner, "OnlyOwner()");
-
-        address tokenIn;
-        address tokenOut;
-        uint24 fee;
-        assembly {
-            tokenIn := div(mload(add(add(path, 0x20), 0)), 0x1000000000000000000000000)
-            fee := mload(add(add(path, 0x3), 20))
-            tokenOut := div(mload(add(add(path, 0x20), 24)), 0x1000000000000000000000000)
-        }
-
-        bool zeroForOne = tokenIn < tokenOut;
-        bool partFlag = amountIn != 0;
-        _toPool(tokenIn, fee, tokenOut).swap(
-            address(this),
-            zeroForOne,
-            partFlag ? uint256(amountIn).toInt256() : balanceOfUnderlying(tokenIn).toInt256(),
-            zeroForOne ? MIN_SQRT_RATIO : MAX_SQRT_RATIO,
-            path
-        );
-
-        amountOut = uint128(cs().amount);
-        cs().amount = DEFAULT_AMOUNT_CACHED;
-        require(amountOut >= amountOutMinimum, "Received too little");
     }
 
     function _openPosition(uint128 amountIn, bytes memory path) internal returns (uint128 amountOut) {

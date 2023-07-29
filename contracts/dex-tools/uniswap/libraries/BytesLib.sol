@@ -13,19 +13,13 @@ library BytesLib {
         bytes memory _bytes,
         uint256 _start,
         uint256 _length
-    ) internal pure returns (bytes memory) {
-        require(_length + 31 >= _length, 'slice_overflow');
-        require(_start + _length >= _start, 'slice_overflow');
-        require(_bytes.length >= _start + _length, 'slice_outOfBounds');
-
-        bytes memory tempBytes;
-
+    ) internal pure returns (bytes memory byteData) {
         assembly {
             switch iszero(_length)
                 case 0 {
-                    // Get a location of some free memory and store it in tempBytes as
+                    // Get a location of some free memory and store it in byteData as
                     // Solidity does for memory variables.
-                    tempBytes := mload(0x40)
+                    byteData := mload(0x40)
 
                     // The first word of the slice result is potentially a partial
                     // word read from the original array. To read it, we calculate
@@ -41,7 +35,7 @@ library BytesLib {
                     // because when slicing multiples of 32 bytes (lengthmod == 0)
                     // the following copy loop was copying the origin's length
                     // and then ending prematurely not copying everything it should.
-                    let mc := add(add(tempBytes, lengthmod), mul(0x20, iszero(lengthmod)))
+                    let mc := add(add(byteData, lengthmod), mul(0x20, iszero(lengthmod)))
                     let end := add(mc, _length)
 
                     for {
@@ -55,7 +49,7 @@ library BytesLib {
                         mstore(mc, mload(cc))
                     }
 
-                    mstore(tempBytes, _length)
+                    mstore(byteData, _length)
 
                     //update free-memory pointer
                     //allocating the array padded to 32 bytes like the compiler does now
@@ -63,39 +57,25 @@ library BytesLib {
                 }
                 //if we want a zero-length slice let's just return a zero-length array
                 default {
-                    tempBytes := mload(0x40)
+                    byteData := mload(0x40)
                     //zero out the 32 bytes slice we are about to return
                     //we need to do it because Solidity does not garbage collect
-                    mstore(tempBytes, 0)
+                    mstore(byteData, 0)
 
-                    mstore(0x40, add(tempBytes, 0x20))
+                    mstore(0x40, add(byteData, 0x20))
                 }
         }
-
-        return tempBytes;
     }
 
-    function toAddress(bytes memory _bytes, uint256 _start) internal pure returns (address) {
-        require(_start + 20 >= _start, 'toAddress_overflow');
-        require(_bytes.length >= _start + 20, 'toAddress_outOfBounds');
-        address tempAddress;
-
+    function toAddress(bytes memory _bytes, uint256 _start) internal pure returns (address addr) {
         assembly {
-            tempAddress := div(mload(add(add(_bytes, 0x20), _start)), 0x1000000000000000000000000)
+            addr := div(mload(add(add(_bytes, 0x20), _start)), 0x1000000000000000000000000)
         }
-
-        return tempAddress;
     }
 
-    function toUint24(bytes memory _bytes, uint256 _start) internal pure returns (uint24) {
-        require(_start + 3 >= _start, 'toUint24_overflow');
-        require(_bytes.length >= _start + 3, 'toUint24_outOfBounds');
-        uint24 tempUint;
-
+    function toUint24(bytes memory _bytes, uint256 _start) internal pure returns (uint24 nr) {
         assembly {
-            tempUint := mload(add(add(_bytes, 0x3), _start))
+            nr := mload(add(add(_bytes, 0x3), _start))
         }
-
-        return tempUint;
     }
 }
