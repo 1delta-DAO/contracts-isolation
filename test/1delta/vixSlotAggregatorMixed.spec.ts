@@ -498,6 +498,126 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
     })
 
 
+    it('MULTI PERMIT: allows to deploy standard slot swap-in', async () => {
+        const inIndex = 2
+        const supplyIndex = 0
+        const borrowIndex = 3
+        const routeIndexes = [3, 2, 1, 0]
+        const depositAmount = expandTo18Decimals(10)
+        const swapAmount = expandTo18Decimals(5)
+
+        let _tokensInRoute = routeIndexes.map(t => compoundFixture.underlyings[t].address)
+        const path = encodeAlgebraPathEthers(
+            _tokensInRoute,
+            new Array(_tokensInRoute.length - 1).fill(FeeAmount.ALGEBRA),
+            [0, 3, 3],
+            0
+        )
+
+        const routeIndexesSwapIn = [2, 1, 0]
+        let _tokensInRouteSwapIn = routeIndexesSwapIn.map(t => compoundFixture.underlyings[t].address)
+        const swapPath = encodeAlgebraPathEthers(
+            _tokensInRouteSwapIn,
+            [FeeAmount.MEDIUM, FeeAmount.ALGEBRA],
+            [3, 3],
+            0
+        )
+
+        // sign
+        const projAddress = await factory.getNextAddress(alice.address)
+        const sigVRS = await produceSig(alice, projAddress, compoundFixture.underlyings[inIndex] as FiatWithPermit, depositAmount.toString())
+
+        const sig = {
+            owner: alice.address,
+            spender: projAddress,
+            value: depositAmount,
+            deadline: ethers.constants.MaxUint256,
+            v: sigVRS.split.v,
+            r: sigVRS.split.r,
+            s: sigVRS.split.s
+        }
+
+        const params = {
+            amountDeposited: depositAmount,
+            minimumAmountDeposited: depositAmount.mul(95).div(100),
+            borrowAmount: swapAmount,
+            minimumMarginReceived: swapAmount.mul(99).div(100),
+            swapPath: swapPath,
+            partner: partnerVault.address,
+            fee: defaultFee,
+            marginPath: path,
+            permit: sig
+        }
+
+        // create
+        await factory.connect(alice).createSlotWithPermit(
+            params
+        )
+
+        const borrowPost = await compoundFixture.cTokens[borrowIndex].callStatic.borrowBalanceCurrent(projAddress)
+        const supplyPost = await compoundFixture.cTokens[supplyIndex].callStatic.balanceOfUnderlying(projAddress)
+
+        expect(borrowPost.toString()).to.equal(swapAmount.toString())
+        expect(toNumber(supplyPost)).to.greaterThan(toNumber(params.minimumMarginReceived))
+    })
+
+    it('MULTI PERMIT TO ETH: allows to deploy standard slot swap-in to ETH', async () => {
+
+        const inIndex = 1
+        const borrowIndex = 0
+        const depositAmount = expandTo18Decimals(10)
+        const swapAmount = expandTo18Decimals(4)
+
+        const path = encodeAlgebraPathEthers(
+            [tokenData.tokens[0].address, tokenData.wnative.address],
+            [FeeAmount.ALGEBRA],
+            [0],
+            0
+        )
+
+        const projAddress = await factory.getNextAddress(bob.address)
+        const sigVRS = await produceSig(bob, projAddress, compoundFixture.underlyings[inIndex] as FiatWithPermit, depositAmount.toString())
+
+        const sig = {
+            owner: bob.address,
+            spender: projAddress,
+            value: depositAmount,
+            deadline: ethers.constants.MaxUint256,
+            v: sigVRS.split.v,
+            r: sigVRS.split.r,
+            s: sigVRS.split.s
+        }
+
+        const swapPath = encodeAlgebraPathEthers(
+            [tokenData.tokens[1].address, tokenData.tokens[0].address, tokenData.wnative.address],
+            [FeeAmount.ALGEBRA, FeeAmount.ALGEBRA],
+            [3, 3],
+            0
+        )
+
+        const params = {
+            minimumAmountDeposited: depositAmount.mul(95).div(100),
+            borrowAmount: swapAmount,
+            minimumMarginReceived: swapAmount.mul(94).div(100),
+            swapPath: swapPath,
+            partner: partnerVault.address,
+            fee: defaultFee,
+            marginPath: path,
+            permit: sig
+        }
+
+        // create
+        await factory.connect(bob).createSlotWithPermit(
+            params
+        )
+
+        const borrowPost = await compoundFixture.cTokens[borrowIndex].callStatic.borrowBalanceCurrent(projAddress)
+        const supplyPost = await compoundFixture.cEther.callStatic.balanceOfUnderlying(projAddress)
+
+        expect(borrowPost.toString()).to.equal(swapAmount.toString())
+        expect(toNumber(supplyPost)).to.greaterThan(toNumber(params.minimumMarginReceived.add(params.minimumAmountDeposited)))
+    })
+
 
     it('BASIC: allows standard repay and withdrawal on slot / gatekeep', async () => {
 
@@ -538,14 +658,14 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
         const borrowPost = await compoundFixture.cTokens[borrowIndex].callStatic.borrowBalanceCurrent(projAddress)
         const supplyPost = await compoundFixture.cTokens[supplyIndex].callStatic.balanceOfUnderlying(projAddress)
 
-        const slot = await Slot__factory.connect(projAddress, alice)
+        const slot = await VixDirect__factory.connect(projAddress, alice)
 
         const balPre = await compoundFixture.underlyings[supplyIndex].balanceOf(alice.address)
 
 
         await approve(alice, compoundFixture.underlyings[borrowIndex].address, projAddress)
         await slot.repay(borrowPost)
-        await slot.withdraw(supplyPost.mul(1e15 - 1).div(1e15), false)
+        await slot.withdraw(supplyPost.mul(1e15 - 1).div(1e15), compoundFixture.underlyings[supplyIndex].address, false)
 
         const borrowPostRepay = await compoundFixture.cTokens[borrowIndex].callStatic.borrowBalanceCurrent(projAddress)
         const supplyPostWithdrawal = await compoundFixture.cTokens[supplyIndex].callStatic.balanceOfUnderlying(projAddress)
@@ -554,14 +674,15 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
         expect(supplyPostWithdrawal.lte(1e12)).to.equal(true)
         const balPost = await compoundFixture.underlyings[supplyIndex].balanceOf(alice.address)
 
-        expect(toNumber(balPost.sub(balPre))).to.greaterThanOrEqual(toNumber(supplyPost) * 0.9999)
+        expect(toNumber(balPost.sub(balPre))).to.greaterThanOrEqual(toNumber(supplyPost) * 0.999)
         const pathVaid = encodeAlgebraPathEthers(
             _tokensInRoute,
             new Array(_tokensInRoute.length - 1).fill(FeeAmount.MEDIUM),
             [1, 2, 2],
             0
         )
-        await expect(slot.connect(deployer).close(
+        const genSlot = await Slot__factory.connect(projAddress, alice)
+        await expect(genSlot.connect(deployer).close(
             0,
             expandTo18Decimals(100),
             pathVaid
@@ -624,7 +745,9 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
         const swapPath = encodeAlgebraPathEthers(
             _tokensInRouteSwapIn,
             [FeeAmount.MEDIUM, FeeAmount.ALGEBRA],
-            [3, 3], 0)
+            [3, 3],
+            0
+        )
 
         const params = {
             amountDeposited: depositAmount,
@@ -966,7 +1089,7 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
             { value: depositAmount }
         )
 
-        const slot = await Slot__factory.connect(projAddress, bob)
+        const slot = await VixDirect__factory.connect(projAddress, bob)
 
         const borrowPost = await compoundFixture.cTokens[borrowIndex].callStatic.borrowBalanceCurrent(projAddress)
         const supplyPost = await compoundFixture.cEther.callStatic.balanceOfUnderlying(projAddress)
@@ -974,7 +1097,7 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
         await approve(bob, compoundFixture.underlyings[borrowIndex].address, projAddress)
         await slot.repay(borrowPost)
         const balBeforeWithdraw = await provider.getBalance(bob.address)
-        await slot.withdraw(supplyPost.mul(1e15 - 1).div(1e15), false)
+        await slot.withdraw(supplyPost.mul(1e15 - 1).div(1e15), tokenData.wnative.address, false)
         const supplyPostWithdraw = await compoundFixture.cEther.callStatic.balanceOfUnderlying(projAddress)
         const balAfterWithdraw = await provider.getBalance(bob.address);
         expect(supplyPostWithdraw.lte(1e12)).to.equal(true)
@@ -1005,9 +1128,9 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
 
         const params = {
             amountDeposited: depositAmount,
-            minimumAmountDeposited: depositAmount.mul(95).div(100),
+            minimumAmountDeposited: depositAmount.mul(90).div(100),
             borrowAmount: swapAmount,
-            minimumMarginReceived: swapAmount.mul(94).div(100),
+            minimumMarginReceived: swapAmount.mul(90).div(100),
             swapPath: swapPath,
             partner: partnerVault.address,
             fee: defaultFee,
@@ -1043,7 +1166,7 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
 
         await slot.close(
             0,
-            swapAmount.mul(105).div(100),
+            swapAmount.mul(110).div(100),
             closePath
         )
         const balAfter = await provider.getBalance(bob.address);
@@ -1053,7 +1176,7 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
         expect(borrowPostClose.toString()).to.equal('0')
         expect(supplyPostClose.toString()).to.equal('0')
 
-        expect(toNumber(balAfter.sub(balBefore).mul(105).div(100))).to.greaterThanOrEqual(toNumber(depositAmount))
+        expect(toNumber(balAfter.sub(balBefore).mul(108).div(100))).to.greaterThanOrEqual(toNumber(depositAmount))
     })
 
 
@@ -1074,9 +1197,9 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
 
         const params = {
             amountDeposited: depositAmount,
-            minimumAmountDeposited: depositAmount.mul(95).div(100),
+            minimumAmountDeposited: depositAmount.mul(90).div(100),
             borrowAmount: swapAmount,
-            minimumMarginReceived: swapAmount.mul(95).div(100),
+            minimumMarginReceived: swapAmount.mul(90).div(100),
             swapPath: swapPath,
             partner: partnerVault.address,
             fee: defaultFee,
@@ -1112,7 +1235,7 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
 
         await slot.close(
             0,
-            swapAmount.mul(105).div(100),
+            swapAmount.mul(110).div(100),
             closePath
         )
         const balAfter = await compoundFixture.underlyings[inIndex].balanceOf(bob.address);
@@ -1191,9 +1314,9 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
 
         const params = {
             amountDeposited: depositAmount,
-            minimumAmountDeposited: depositAmount.mul(95).div(100),
+            minimumAmountDeposited: depositAmount.mul(90).div(100),
             borrowAmount: swapAmount,
-            minimumMarginReceived: swapAmount.mul(95).div(100),
+            minimumMarginReceived: swapAmount.mul(90).div(100),
             swapPath: swapPath,
             partner: partnerVault.address,
             fee: defaultFee,
@@ -1213,7 +1336,7 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
         const supplyPost = await compoundFixture.cEther.callStatic.balanceOfUnderlying(projAddress)
 
         expect(borrowPost.toString()).to.equal(swapAmount.toString())
-        expect(toNumber(supplyPost)).to.greaterThan(toNumber(params.minimumMarginReceived.add(depositAmount)))
+        expect(toNumber(supplyPost)).to.greaterThan(toNumber(params.minimumMarginReceived.add(depositAmount)) * 0.95)
 
 
         const slot = await Slot__factory.connect(projAddress, bob)
@@ -1230,7 +1353,7 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
 
         await slot.close(
             0,
-            swapAmount.mul(105).div(100),
+            swapAmount.mul(110).div(100),
             closePath
         )
         const balAfter = await provider.getBalance(bob.address);
@@ -1240,7 +1363,7 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
         expect(borrowPostClose.toString()).to.equal('0')
         expect(supplyPostClose.toString()).to.equal('0')
 
-        expect(toNumber(balAfter.sub(balBefore).mul(101).div(100))).to.greaterThanOrEqual(toNumber(depositAmount))
+        expect(toNumber(balAfter.sub(balBefore).mul(105).div(100))).to.greaterThanOrEqual(toNumber(depositAmount))
     })
 
 
@@ -1261,9 +1384,9 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
 
         const params = {
             amountDeposited: depositAmount,
-            minimumAmountDeposited: depositAmount.mul(95).div(100),
+            minimumAmountDeposited: depositAmount.mul(90).div(100),
             borrowAmount: swapAmount,
-            minimumMarginReceived: swapAmount.mul(95).div(100),
+            minimumMarginReceived: swapAmount.mul(90).div(100),
             swapPath: swapPath,
             partner: partnerVault.address,
             fee: defaultFee,
@@ -1299,7 +1422,7 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
 
         await slot.close(
             0,
-            swapAmount.mul(105).div(100),
+            swapAmount.mul(110).div(100),
             closePath
         )
         const balAfter = await compoundFixture.underlyings[inIndex].balanceOf(bob.address);

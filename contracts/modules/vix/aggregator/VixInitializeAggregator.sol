@@ -13,50 +13,12 @@ import {INativeWrapper} from "../../../interfaces/INativeWrapper.sol";
 import {WithVixStorage, VixDetailsStorage} from "../VixStorage.sol";
 import {SafeCast} from "../../../dex-tools/uniswap/libraries/SafeCast.sol";
 import {FeeTransfer} from "../fees/FeeTransfer.sol";
+import {InitParams, PermitParams, InitParamsWithPermit} from "../interfaces/ISlot.sol";
 
-struct InitParams {
-    // deposit amounts
-    uint128 amountDeposited;
-    uint128 minimumAmountDeposited;
-    // margin swap params
-    uint128 borrowAmount;
-    uint128 minimumMarginReceived;
-    // contains only the address if pay ccy = collateral
-    bytes swapPath;
-    // path for margin trade
-    bytes marginPath;
-    // fee parameters
-    address partner;
-    uint32 fee;
-}
-
-// permit
-struct PermitParams {
-    address owner;
-    address spender;
-    uint256 value;
-    uint256 deadline;
-    uint8 v;
-    bytes32 r;
-    bytes32 s;
-}
-
-struct InitParamsWithPermit {
-    // deposit amounts
-    uint128 minimumAmountDeposited;
-    // margin swap params
-    uint128 borrowAmount;
-    uint128 minimumMarginReceived;
-    // contains only the address if pay ccy = collateral
-    bytes swapPath;
-    // path for margin trade
-    bytes marginPath;
-    PermitParams permit;
-    // fee parameters
-    address partner;
-    uint32 fee;
-}
-
+/**
+ * @title VixInitializeAggregator
+ * @notice Initialization functions for slot - ideally called by a factory contract
+ */
 contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer {
     using SafeCast for uint256;
 
@@ -113,13 +75,13 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer 
 
             // in case we swapped to wrapped native
             if (_tokenCollateral == NATIVE_WRAPPER) {
-                cTokenCollateral = IDataProvider(dataProvider).cEther();
+                cTokenCollateral = IDataProvider(dataProvider).oEther();
                 INativeWrapper(_tokenCollateral).withdraw(_deposited);
                 ICompoundTypeCEther(cTokenCollateral).mint{value: _deposited}();
             }
             // in case we swap to any other erc20
             else {
-                cTokenCollateral = IDataProvider(dataProvider).cToken(_tokenCollateral);
+                cTokenCollateral = IDataProvider(dataProvider).oToken(_tokenCollateral);
                 // approve collateral token
                 IERC20(_tokenCollateral).approve(cTokenCollateral, _deposited);
                 // deposit collateral
@@ -128,7 +90,7 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer 
         }
         // deposit cannot be Ether - handled by other function
         else {
-            cTokenCollateral = IDataProvider(dataProvider).cToken(_tokenCollateral);
+            cTokenCollateral = IDataProvider(dataProvider).oToken(_tokenCollateral);
             // approve deposit token (can also be the collateral token)
             IERC20(_tokenCollateral).approve(cTokenCollateral, _deposited);
 
@@ -180,7 +142,7 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer 
                 _tokenCollateral := div(mload(add(add(_bytes, 0x20), sub(bytesLength, 21))), 0x1000000000000000000000000)
             }
             if (_deposited < params.minimumAmountDeposited) revert Slippage();
-            cTokenCollateral = IDataProvider(dataProvider).cToken(_tokenCollateral);
+            cTokenCollateral = IDataProvider(dataProvider).oToken(_tokenCollateral);
             // approve deposit token (can also be the collateral token)
             IERC20(_tokenCollateral).approve(cTokenCollateral, type(uint256).max);
             // deposit collateral
@@ -188,7 +150,7 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer 
         }
         // direct deposit - directly supply of Ether
         else {
-            cTokenCollateral = IDataProvider(dataProvider).cEther();
+            cTokenCollateral = IDataProvider(dataProvider).oEther();
             ICompoundTypeCEther(cTokenCollateral).mint{value: _deposited}();
         }
 
@@ -196,6 +158,94 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer 
         gs().collateral = _tokenCollateral;
 
         // configure collateral
+        address[] memory collateralArray = new address[](1);
+        collateralArray[0] = cTokenCollateral;
+        IDataProvider(dataProvider).getComptroller().enterMarkets(collateralArray);
+
+        // set owner
+        ads().owner = owner;
+        uint128 borrowAmount = params.borrowAmount;
+        details.debtSwapped = uint112(borrowAmount);
+        // margin swap
+        uint128 _received = _openPosition(borrowAmount, params.marginPath);
+        details.collateralSwapped = uint112(_received);
+        if (_received < params.minimumMarginReceived) revert Slippage();
+    }
+
+    /**
+     * @dev Allows creation of position with permit (e.g. DAI, USDC etc.)
+     */
+    function initializeWithPermit(InitParamsWithPermit calldata params) external payable virtual {
+        VixDetailsStorage memory details = ds();
+        address dataProvider = DATA_PROVIDER;
+        if (details.initialized != 0) revert AlreadyInitialized();
+        details.initialized = 1;
+
+        bytes memory _bytes = params.swapPath;
+        address _tokenCollateral;
+        details.creationTime = uint32(block.timestamp % 2**32);
+
+        // fetch token and flag for more data
+        assembly {
+            _tokenCollateral := div(mload(add(add(_bytes, 0x20), 0)), 0x1000000000000000000000000)
+        }
+
+        address owner = params.permit.owner;
+        uint256 _deposited = params.permit.value;
+
+        IERC20Permit(_tokenCollateral).permit(
+            owner,
+            params.permit.spender,
+            _deposited,
+            params.permit.deadline,
+            params.permit.v,
+            params.permit.r,
+            params.permit.s
+        );
+
+        // transfer collateral from user and deposit to aave
+        _transferERC20TokensFrom(_tokenCollateral, owner, address(this), _deposited);
+        _deposited = applyFeeAndTransfer(_tokenCollateral, _deposited, params.partner, params.fee);
+        address cTokenCollateral;
+
+        // swap if full calldata is provided
+        if (_bytes.length > 22) {
+            _deposited = exactInputToSelf(_deposited, _bytes);
+            uint256 index = _bytes.length;
+            assembly {
+                _tokenCollateral := div(mload(add(add(_bytes, 0x20), sub(index, 21))), 0x1000000000000000000000000)
+            }
+            if (_deposited < params.minimumAmountDeposited) revert Slippage();
+
+            // in case we swapped to wrapped native
+            if (_tokenCollateral == NATIVE_WRAPPER) {
+                cTokenCollateral = IDataProvider(dataProvider).oEther();
+                INativeWrapper(_tokenCollateral).withdraw(_deposited);
+                ICompoundTypeCEther(cTokenCollateral).mint{value: _deposited}();
+            }
+            // in case we swap to any other erc20
+            else {
+                cTokenCollateral = IDataProvider(dataProvider).oToken(_tokenCollateral);
+                // approve collateral token
+                IERC20(_tokenCollateral).approve(cTokenCollateral, _deposited);
+                // deposit collateral
+                ICompoundTypeCERC20(cTokenCollateral).mint(_deposited);
+            }
+        }
+        // in direct case deposit cannot be ETH
+        else {
+            // get erc20 cToken
+            cTokenCollateral = IDataProvider(dataProvider).oToken(_tokenCollateral);
+            // capprove deposit token
+            IERC20(_tokenCollateral).approve(cTokenCollateral, _deposited);
+            // deposit collateral
+            ICompoundTypeCERC20(cTokenCollateral).mint(_deposited);
+        }
+
+        // assign collateral
+        gs().collateral = _tokenCollateral;
+
+        // configure collateral - has to be an array
         address[] memory collateralArray = new address[](1);
         collateralArray[0] = cTokenCollateral;
         IDataProvider(dataProvider).getComptroller().enterMarkets(collateralArray);
@@ -236,7 +286,7 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer 
         bool partFlag = amountToRepay != 0;
         uint256 amountOut = partFlag
             ? amountToRepay
-            : ICompoundTypeCERC20(tokenOut == native ? IDataProvider(DATA_PROVIDER).cEther() : IDataProvider(DATA_PROVIDER).cToken(tokenOut))
+            : ICompoundTypeCERC20(tokenOut == native ? IDataProvider(DATA_PROVIDER).oEther() : IDataProvider(DATA_PROVIDER).oToken(tokenOut))
                 .borrowBalanceCurrent(address(this));
 
         bool zeroForOne = tokenIn < tokenOut;
@@ -278,72 +328,45 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer 
         }
     }
 
+    struct LiquidatePositionParams {
+        bytes path;
+        uint128 amountIn;
+        uint128 amountOutMinimum;
+    }
+
     /**
-     * @dev Allows creation of position with permit (e.g. DAI, USDC etc.)
+     * @dev Liquidate debt with exact input swap. If amountIn = 0, the whole collateral will be used.
+     *  Input token can either be the collateral token or the deposit token
      */
-    function initializeWithPermit(InitParamsWithPermit calldata params) external payable virtual {
-        VixDetailsStorage memory details = ds();
-        address dataProvider = DATA_PROVIDER;
-        if (details.initialized != 0) revert AlreadyInitialized();
-        details.initialized = 1;
+    function liquidatePosition(
+        uint128 amountIn,
+        uint128 amountOutMinimum,
+        bytes memory path
+    ) public virtual returns (uint128 amountOut) {
+        require(msg.sender == ads().owner, "OnlyOwner()");
 
-        bytes memory _bytes = params.swapPath;
-        address _tokenCollateral;
-        details.creationTime = uint32(block.timestamp % 2**32);
-
-        // fetch token and flag for more data
+        address tokenIn;
+        address tokenOut;
+        uint24 fee;
         assembly {
-            _tokenCollateral := div(mload(add(add(_bytes, 0x20), 0)), 0x1000000000000000000000000)
+            tokenIn := div(mload(add(add(path, 0x20), 0)), 0x1000000000000000000000000)
+            fee := mload(add(add(path, 0x3), 20))
+            tokenOut := div(mload(add(add(path, 0x20), 24)), 0x1000000000000000000000000)
         }
 
-        address owner = params.permit.owner;
-        uint256 _deposited = params.permit.value;
-
-        IERC20Permit(_tokenCollateral).permit(
-            owner,
-            params.permit.spender,
-            _deposited,
-            params.permit.deadline,
-            params.permit.v,
-            params.permit.r,
-            params.permit.s
+        bool zeroForOne = tokenIn < tokenOut;
+        bool partFlag = amountIn != 0;
+        _toPool(tokenIn, fee, tokenOut).swap(
+            address(this),
+            zeroForOne,
+            partFlag ? uint256(amountIn).toInt256() : balanceOfUnderlying(tokenIn).toInt256(),
+            zeroForOne ? MIN_SQRT_RATIO : MAX_SQRT_RATIO,
+            path
         );
 
-        // transfer collateral from user and deposit to aave
-        _transferERC20TokensFrom(_tokenCollateral, owner, address(this), _deposited);
-        _deposited = applyFeeAndTransfer(_tokenCollateral, _deposited, params.partner, params.fee);
-
-        // swap if full calldata is provided
-        if (_bytes.length > 22) {
-            _deposited = exactInputToSelf(_deposited, _bytes);
-            uint256 index = _bytes.length;
-            assembly {
-                _tokenCollateral := div(mload(add(add(_bytes, 0x20), sub(index, 21))), 0x1000000000000000000000000)
-            }
-            if (_deposited < params.minimumAmountDeposited) revert Slippage();
-        }
-        // assign collateral
-        gs().collateral = _tokenCollateral;
-        address cTokenCollateral = IDataProvider(dataProvider).cToken(_tokenCollateral);
-        // capprove deposit token (can also be the collateral token)
-        IERC20(_tokenCollateral).approve(cTokenCollateral, _deposited);
-
-        // configure collateral - has to be an array
-        address[] memory collateralArray = new address[](1);
-        collateralArray[0] = cTokenCollateral;
-        IDataProvider(dataProvider).getComptroller().enterMarkets(collateralArray);
-
-        // deposit collateral
-        ICompoundTypeCERC20(cTokenCollateral).mint(_deposited);
-
-        // set owner
-        ads().owner = owner;
-        uint128 borrowAmount = params.borrowAmount;
-        details.debtSwapped = uint112(borrowAmount);
-        // margin swap
-        uint128 _received = _openPosition(borrowAmount, params.marginPath);
-        details.collateralSwapped = uint112(_received);
-        if (_received < params.minimumMarginReceived) revert Slippage();
+        amountOut = uint128(cs().amount);
+        cs().amount = DEFAULT_AMOUNT_CACHED;
+        require(amountOut >= amountOutMinimum, "Received too little");
     }
 
     function _openPosition(uint128 amountIn, bytes memory path) internal returns (uint128 amountOut) {
@@ -370,17 +393,17 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer 
         cs().amount = DEFAULT_AMOUNT_CACHED;
     }
 
-    function getCTokens() external view returns (address cTokenCollateral, address cTokenBorrow) {
+    function getOTokens() external view returns (address cTokenCollateral, address cTokenBorrow) {
         address wrapper = NATIVE_WRAPPER;
         address dataProvider = DATA_PROVIDER;
 
         address debt = gs().debt;
         address collateral = gs().collateral;
-        if (debt == wrapper) return (IDataProvider(dataProvider).cToken(collateral), IDataProvider(dataProvider).cEther());
+        if (debt == wrapper) return (IDataProvider(dataProvider).oToken(collateral), IDataProvider(dataProvider).oEther());
 
-        if (collateral == wrapper) return (IDataProvider(dataProvider).cEther(), IDataProvider(dataProvider).cToken(debt));
+        if (collateral == wrapper) return (IDataProvider(dataProvider).oEther(), IDataProvider(dataProvider).oToken(debt));
 
-        return (IDataProvider(dataProvider).cToken(collateral), IDataProvider(dataProvider).cToken(debt));
+        return (IDataProvider(dataProvider).oToken(collateral), IDataProvider(dataProvider).oToken(debt));
     }
 
     function getOpenAmounts() external view returns (uint256, uint256) {
@@ -389,5 +412,9 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer 
 
     function getDetails() external pure returns (VixDetailsStorage memory details) {
         return ds();
+    }
+
+    function balanceOfUnderlying(address underlying) internal virtual returns (uint256) {
+        return ICompoundTypeCERC20(IDataProvider(DATA_PROVIDER).oToken(underlying)).balanceOfUnderlying(address(this));
     }
 }

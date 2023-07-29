@@ -42,9 +42,9 @@ contract VixDirect is WithVixStorage, TokenTransfer {
         uint256 _amount = amount;
         if (debt == NATIVE_WRAPPER) {
             _amount = msg.value;
-            ICompoundTypeCEther(IDataProvider(DATA_PROVIDER).cEther()).repayBorrow{value: _amount}();
+            ICompoundTypeCEther(IDataProvider(DATA_PROVIDER).oEther()).repayBorrow{value: _amount}();
         } else {
-            address _cToken = IDataProvider(DATA_PROVIDER).cToken(debt);
+            address _cToken = IDataProvider(DATA_PROVIDER).oToken(debt);
             // approve
             _transferERC20TokensFrom(debt, msg.sender, address(this), _amount);
             IERC20(debt).approve(_cToken, _amount);
@@ -56,39 +56,39 @@ contract VixDirect is WithVixStorage, TokenTransfer {
     /**
      * Allows users to withdraw directly from the position. Only the owner can withdraw.
      */
-    function withdraw(uint256 amount, bool useCTokens) external payable {
+    function withdraw(uint256 amount, address asset, bool useCTokens) external payable {
         // efficient OnlyOwner() check
         address owner = ads().owner;
         require(msg.sender == owner, "OnlyOwner()");
 
-        address collateral = gs().collateral;
+        address _withdrawAsset = asset;
         uint256 _amount = amount;
-        if (collateral == NATIVE_WRAPPER) {
+        if (_withdrawAsset == NATIVE_WRAPPER) {
             if (useCTokens) {
-                ICompoundTypeCEther(IDataProvider(DATA_PROVIDER).cEther()).redeem(_amount);
+                ICompoundTypeCEther(IDataProvider(DATA_PROVIDER).oEther()).redeem(_amount);
                 _amount = address(this).balance;
 
                 // transfer all ether in this contract
                 payable(owner).transfer(_amount);
             } else {
-                ICompoundTypeCEther(IDataProvider(DATA_PROVIDER).cEther()).redeemUnderlying(_amount);
+                ICompoundTypeCEther(IDataProvider(DATA_PROVIDER).oEther()).redeemUnderlying(_amount);
 
                 // transfer selected amount
                 payable(owner).transfer(_amount);
             }
         } else {
-            address _cToken = IDataProvider(DATA_PROVIDER).cToken(collateral);
+            address _cToken = IDataProvider(DATA_PROVIDER).oToken(_withdrawAsset);
 
             if (useCTokens) {
                 ICompoundTypeCERC20(_cToken).redeem(_amount);
-                _amount = IERC20(collateral).balanceOf(address(this));
+                _amount = IERC20(_withdrawAsset).balanceOf(address(this));
 
-                IERC20(collateral).transfer(owner, _amount);
+                IERC20(_withdrawAsset).transfer(owner, _amount);
             } else {
                 ICompoundTypeCERC20(_cToken).redeemUnderlying(_amount);
 
                 // transfer the user selected amount
-                IERC20(collateral).transfer(owner, _amount);
+                IERC20(_withdrawAsset).transfer(owner, _amount);
             }
         }
     }

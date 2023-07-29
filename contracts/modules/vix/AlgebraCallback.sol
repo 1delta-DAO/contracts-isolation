@@ -86,12 +86,12 @@ contract AlgebraCallback is BaseSwapper, TokenTransfer, WithVixStorage {
             address native = NATIVE_WRAPPER;
             // debt is ETH
             if (native == tokenIn) {
-                address cTokenOut = IDataProvider(DATA_PROVIDER).cToken(tokenOut);
+                address cTokenOut = IDataProvider(DATA_PROVIDER).oToken(tokenOut);
                 IERC20(tokenOut).approve(cTokenOut, amountToSupply);
                 // deposit regular ERC20
                 ICompoundTypeCERC20(cTokenOut).mint(amountToSupply);
                 // borrow ETH
-                ICompoundTypeCEther(IDataProvider(DATA_PROVIDER).cEther()).borrow(amountToBorrow);
+                ICompoundTypeCEther(IDataProvider(DATA_PROVIDER).oEther()).borrow(amountToBorrow);
                 // deposit ETH for wETH
                 INativeWrapper(tokenIn).deposit{value: amountToBorrow}();
                 // transfer WETH
@@ -102,21 +102,21 @@ contract AlgebraCallback is BaseSwapper, TokenTransfer, WithVixStorage {
                     // withdraw WETH
                     INativeWrapper(tokenOut).withdraw(amountToSupply); // unwrap
                     // deposit ETH
-                    ICompoundTypeCEther(IDataProvider(DATA_PROVIDER).cEther()).mint{value: amountToSupply}();
+                    ICompoundTypeCEther(IDataProvider(DATA_PROVIDER).oEther()).mint{value: amountToSupply}();
                     // reqassign to save gas
-                    tokenOut = IDataProvider(DATA_PROVIDER).cToken(tokenIn);
+                    tokenOut = IDataProvider(DATA_PROVIDER).oToken(tokenIn);
                     // borrow regular ERC20
                     ICompoundTypeCERC20(tokenOut).borrow(amountToBorrow);
                     // transfer ERC20
                     _transferERC20Tokens(tokenIn, msg.sender, amountToBorrow);
                 } else {
                     // only ERC20
-                    address _cToken = IDataProvider(DATA_PROVIDER).cToken(tokenOut);
+                    address _cToken = IDataProvider(DATA_PROVIDER).oToken(tokenOut);
                     IERC20(tokenOut).approve(_cToken, amountToSupply);
                     // deposit regular ERC20
                     ICompoundTypeCERC20(_cToken).mint(amountToSupply);
 
-                    _cToken = IDataProvider(DATA_PROVIDER).cToken(tokenIn);
+                    _cToken = IDataProvider(DATA_PROVIDER).oToken(tokenIn);
                     // borrow regular ERC20
                     ICompoundTypeCERC20(_cToken).borrow(amountToBorrow);
                     // transfer ERC20
@@ -134,11 +134,11 @@ contract AlgebraCallback is BaseSwapper, TokenTransfer, WithVixStorage {
                 // withdraw WETH
                 INativeWrapper(tokenIn).withdraw(amountToRepay); // unwrap
                 // repay ETH
-                ICompoundTypeCEther(IDataProvider(DATA_PROVIDER).cEther()).repayBorrow{value: amountToRepay}();
+                ICompoundTypeCEther(IDataProvider(DATA_PROVIDER).oEther()).repayBorrow{value: amountToRepay}();
             }
             // repay ERC20
             else {
-                address cTokenIn = IDataProvider(DATA_PROVIDER).cToken(tokenIn);
+                address cTokenIn = IDataProvider(DATA_PROVIDER).oToken(tokenIn);
                 IERC20(tokenIn).approve(cTokenIn, amountToRepay);
                 // repay  regular ERC20
                 ICompoundTypeCERC20(cTokenIn).repayBorrow(amountToRepay);
@@ -172,7 +172,7 @@ contract AlgebraCallback is BaseSwapper, TokenTransfer, WithVixStorage {
                 }
 
                 if (tokenOut == NATIVE_WRAPPER) {
-                    ICompoundTypeCEther cEtherContract = ICompoundTypeCEther(IDataProvider(DATA_PROVIDER).cEther());
+                    ICompoundTypeCEther cEtherContract = ICompoundTypeCEther(IDataProvider(DATA_PROVIDER).oEther());
                     if (tradeType != 0) {
                         cEtherContract.redeemUnderlying(amountToWithdraw);
                     } else {
@@ -184,7 +184,7 @@ contract AlgebraCallback is BaseSwapper, TokenTransfer, WithVixStorage {
                     // transfer WETH
                     IERC20(tokenOut).transfer(msg.sender, amountToWithdraw);
                 } else {
-                    ICompoundTypeCERC20 cTokenContract = ICompoundTypeCERC20(IDataProvider(DATA_PROVIDER).cToken(tokenOut));
+                    ICompoundTypeCERC20 cTokenContract = ICompoundTypeCERC20(IDataProvider(DATA_PROVIDER).oToken(tokenOut));
                     if (tradeType != 0) {
                         cTokenContract.redeemUnderlying(amountToWithdraw);
                     } else {
@@ -221,9 +221,9 @@ contract AlgebraCallback is BaseSwapper, TokenTransfer, WithVixStorage {
                 if (tokenOut == NATIVE_WRAPPER) {
                     // withdraw ETH from cETH
                     if (tradeType != 0) {
-                        ICompoundTypeCEther(IDataProvider(DATA_PROVIDER).cEther()).redeemUnderlying(amountToPay);
+                        ICompoundTypeCEther(IDataProvider(DATA_PROVIDER).oEther()).redeemUnderlying(amountToPay);
                     } else {
-                        ICompoundTypeCEther cEtherContract = ICompoundTypeCEther(IDataProvider(DATA_PROVIDER).cEther());
+                        ICompoundTypeCEther cEtherContract = ICompoundTypeCEther(IDataProvider(DATA_PROVIDER).oEther());
                         // withdraw ETH from cETH
                         cEtherContract.redeem(cEtherContract.balanceOf(address(this)));
                     }
@@ -232,7 +232,7 @@ contract AlgebraCallback is BaseSwapper, TokenTransfer, WithVixStorage {
                     // transfer WETH
                     IERC20(tokenOut).transfer(msg.sender, amountToPay);
                 } else {
-                    ICompoundTypeCERC20 cTokenContract = ICompoundTypeCERC20(IDataProvider(DATA_PROVIDER).cToken(tokenOut));
+                    ICompoundTypeCERC20 cTokenContract = ICompoundTypeCERC20(IDataProvider(DATA_PROVIDER).oToken(tokenOut));
                     // withdraw regular ERC20
                     if (tradeType != 0) {
                         cTokenContract.redeemUnderlying(amountToPay);

@@ -12,6 +12,7 @@ struct AdminStorage {
 struct GeneralStorage {
     address debt;
     address collateral;
+    address deposit; // in the general case this is expected to be the collateral, too
 }
 
 struct VixDetailsStorage {

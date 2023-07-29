@@ -6,12 +6,9 @@ import {IUniswapV3Pool} from "../../../external-protocols/uniswapV3/core/interfa
 import {BytesLib} from "../../../dex-tools/uniswap/libraries/BytesLib.sol";
 import {SafeCast} from "../../../dex-tools/uniswap/libraries/SafeCast.sol";
 
-// solhint-disable max-line-length
-
 /**
- * @title MarginTrader contract
- * @notice Allows users to build large margins positions with one contract interaction
- * @author Achthar
+ * @title BaseAggregator
+ * @notice Contains exact input to self function that efficinetly exchagnes tokens withpout additional external calls/approvals
  */
 abstract contract BaseAggregator {
     using BytesLib for bytes;
