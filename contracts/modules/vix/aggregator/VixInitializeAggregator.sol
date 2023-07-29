@@ -267,6 +267,8 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer 
     function close(
         uint128 amountToRepay,
         uint128 amountInMaximum,
+        address partner,
+        uint32 fee,
         bytes memory path
     ) public payable virtual returns (uint256 amountIn) {
         // efficient OnlyOwner() check
@@ -275,22 +277,31 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer 
 
         address tokenIn; // the token that shares a pool with borrow
         address tokenOut; // token out MUST be borrow token
-        uint24 fee;
+        uint24 poolFee;
         address native = NATIVE_WRAPPER;
         assembly {
             tokenOut := div(mload(add(add(path, 0x20), 0)), 0x1000000000000000000000000)
-            fee := mload(add(add(path, 0x3), 20))
+            poolFee := mload(add(add(path, 0x3), 20))
             tokenIn := div(mload(add(add(path, 0x20), 24)), 0x1000000000000000000000000)
         }
         // if repay amount is set to 0, the full borrow balance will be repaid
         bool partFlag = amountToRepay != 0;
-        uint256 amountOut = partFlag
-            ? amountToRepay
-            : ICompoundTypeCERC20(tokenOut == native ? IDataProvider(DATA_PROVIDER).oEther() : IDataProvider(DATA_PROVIDER).oToken(tokenOut))
-                .borrowBalanceCurrent(address(this));
+        // avoid stack too deep
+        {
+            uint256 amountOut = partFlag
+                ? amountToRepay
+                : ICompoundTypeCERC20(tokenOut == native ? IDataProvider(DATA_PROVIDER).oEther() : IDataProvider(DATA_PROVIDER).oToken(tokenOut))
+                    .borrowBalanceCurrent(address(this));
 
-        bool zeroForOne = tokenIn < tokenOut;
-        _toPool(tokenIn, fee, tokenOut).swap(address(this), zeroForOne, -amountOut.toInt256(), zeroForOne ? MIN_SQRT_RATIO : MAX_SQRT_RATIO, path);
+            bool zeroForOne = tokenIn < tokenOut;
+            _toPool(tokenIn, poolFee, tokenOut).swap(
+                address(this),
+                zeroForOne,
+                -amountOut.toInt256(),
+                zeroForOne ? MIN_SQRT_RATIO : MAX_SQRT_RATIO,
+                path
+            );
+        }
 
         // fetch amount in and clean cache
         amountIn = cs().amount;
@@ -299,39 +310,16 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer 
 
         // when everything is repaid, the amount is withdrawn to the owner
         if (!partFlag) {
-            uint256 withdrawAmount;
-            uint256 deltaFee = 0;
             address collateral = gs().collateral;
             ds().closeTime = uint32(block.timestamp % 2**32);
             if (collateral == native) {
-                withdrawAmount = address(this).balance;
-                if (deltaFee != 0) {
-                    deltaFee = withdrawAmount / deltaFee;
-                    withdrawAmount -= deltaFee;
-                    payable(owner).transfer(withdrawAmount);
-                    payable(FACTORY).transfer(deltaFee);
-                } else {
-                    payable(owner).transfer(withdrawAmount);
-                }
+                uint256 withdrawAmount = applyFeeAndTransferEther(address(this).balance, partner, fee);
+                _transferEth(payable(owner), withdrawAmount);
             } else {
-                IERC20 tokenCollateral = IERC20(collateral);
-                withdrawAmount = tokenCollateral.balanceOf(address(this));
-                if (deltaFee != 0) {
-                    deltaFee = withdrawAmount / deltaFee;
-                    withdrawAmount -= deltaFee;
-                    tokenCollateral.transfer(owner, withdrawAmount);
-                    tokenCollateral.transfer(FACTORY, deltaFee);
-                } else {
-                    tokenCollateral.transfer(owner, withdrawAmount);
-                }
+                uint256 withdrawAmount = applyFeeAndTransfer(collateral, IERC20(collateral).balanceOf(address(this)), partner, fee);
+                _transferERC20Tokens(collateral, owner, withdrawAmount);
             }
         }
-    }
-
-    struct LiquidatePositionParams {
-        bytes path;
-        uint128 amountIn;
-        uint128 amountOutMinimum;
     }
 
     /**

@@ -681,10 +681,12 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
             [1, 2, 2],
             0
         )
-        const genSlot = await Slot__factory.connect(projAddress, alice)
+        const genSlot = await VixInitializeAggregator__factory.connect(projAddress, alice)
         await expect(genSlot.connect(deployer).close(
             0,
             expandTo18Decimals(100),
+            partnerVault.address,
+            defaultFee,
             pathVaid
         )).to.be.revertedWith("OnlyOwner()")
 
@@ -706,12 +708,14 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
         )
         // approve
         const projAddress = await factory.getAddress(alice.address, 0)
-        const slot = await Slot__factory.connect(projAddress, alice)
+        const slot = await VixInitializeAggregator__factory.connect(projAddress, alice)
 
         // create
         await slot.close(
             0,
             expandTo18Decimals(100),
+            partnerVault.address,
+            defaultFee,
             path
         )
 
@@ -1028,7 +1032,7 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
         expect(toNumber(supplyPost)).to.greaterThan(toNumber(params.minimumMarginReceived.add(depositAmount)))
 
 
-        const slot = await Slot__factory.connect(projAddress, bob)
+        const slot = await VixInitializeAggregator__factory.connect(projAddress, bob)
 
 
         const closePath = encodeAlgebraPathEthers(
@@ -1042,6 +1046,8 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
         await slot.close(
             0,
             swapAmount.mul(105).div(100),
+            partnerVault.address,
+            defaultFee,
             closePath
         )
         const balAfter = await provider.getBalance(bob.address);
@@ -1051,7 +1057,7 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
         expect(borrowPostClose.toString()).to.equal('0')
         expect(supplyPostClose.toString()).to.equal('0')
 
-        expect(toNumber(balAfter.sub(balBefore).mul(101).div(100))).to.greaterThanOrEqual(toNumber(depositAmount))
+        expect(toNumber(balAfter.sub(balBefore).mul(105).div(100))).to.greaterThanOrEqual(toNumber(depositAmount))
     })
 
     it('WITHDRAW ETH: Allows to withdraw ETH', async () => {
@@ -1153,7 +1159,7 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
         expect(toNumber(supplyPost)).to.greaterThan(toNumber(params.minimumMarginReceived.add(params.minimumAmountDeposited)))
 
 
-        const slot = await Slot__factory.connect(projAddress, bob)
+        const slot = await VixInitializeAggregator__factory.connect(projAddress, bob)
 
 
         const closePath = encodeAlgebraPathEthers(
@@ -1167,6 +1173,8 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
         await slot.close(
             0,
             swapAmount.mul(110).div(100),
+            partnerVault.address,
+            defaultFee,
             closePath
         )
         const balAfter = await provider.getBalance(bob.address);
@@ -1222,7 +1230,7 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
         expect(toNumber(supplyPost)).to.greaterThan(toNumber(params.minimumMarginReceived.add(depositAmount)))
 
 
-        const slot = await Slot__factory.connect(projAddress, bob)
+        const slot = await VixInitializeAggregator__factory.connect(projAddress, bob)
 
 
         const closePath = encodeAlgebraPathEthers(
@@ -1236,6 +1244,8 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
         await slot.close(
             0,
             swapAmount.mul(110).div(100),
+            partnerVault.address,
+            defaultFee,
             closePath
         )
         const balAfter = await compoundFixture.underlyings[inIndex].balanceOf(bob.address);
@@ -1245,7 +1255,7 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
         expect(borrowPostClose.toString()).to.equal('0')
         expect(supplyPostClose.toString()).to.equal('0')
 
-        expect(toNumber(balAfter.sub(balBefore).mul(101).div(100))).to.greaterThanOrEqual(toNumber(depositAmount))
+        expect(toNumber(balAfter.sub(balBefore).mul(105).div(100))).to.greaterThanOrEqual(toNumber(depositAmount))
     })
 
 
@@ -1287,7 +1297,7 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
 
         const borrowPost = await compoundFixture.cEther.callStatic.borrowBalanceCurrent(projAddress)
 
-        const slot = await Slot__factory.connect(projAddress, bob)
+        const slot = await VixDirect__factory.connect(projAddress, bob)
 
         await slot.repay(0, { value: borrowPost })
 
@@ -1339,7 +1349,7 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
         expect(toNumber(supplyPost)).to.greaterThan(toNumber(params.minimumMarginReceived.add(depositAmount)) * 0.95)
 
 
-        const slot = await Slot__factory.connect(projAddress, bob)
+        const slot = await VixInitializeAggregator__factory.connect(projAddress, bob)
 
 
         const closePath = encodeAlgebraPathEthers(
@@ -1354,6 +1364,8 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
         await slot.close(
             0,
             swapAmount.mul(110).div(100),
+            partnerVault.address,
+            defaultFee,
             closePath
         )
         const balAfter = await provider.getBalance(bob.address);
@@ -1409,7 +1421,7 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
         expect(toNumber(supplyPost)).to.greaterThan(toNumber(params.minimumMarginReceived.add(depositAmount)))
 
 
-        const slot = await Slot__factory.connect(projAddress, bob)
+        const slot = await VixInitializeAggregator__factory.connect(projAddress, bob)
 
 
         const closePath = encodeAlgebraPathEthers(
@@ -1423,6 +1435,8 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
         await slot.close(
             0,
             swapAmount.mul(110).div(100),
+            partnerVault.address,
+            defaultFee,
             closePath
         )
         const balAfter = await compoundFixture.underlyings[inIndex].balanceOf(bob.address);
@@ -1432,7 +1446,7 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
         expect(borrowPostClose.toString()).to.equal('0')
         expect(supplyPostClose.toString()).to.equal('0')
 
-        expect(toNumber(balAfter.sub(balBefore).mul(101).div(100))).to.greaterThanOrEqual(toNumber(depositAmount))
+        expect(toNumber(balAfter.sub(balBefore).mul(105).div(100))).to.greaterThanOrEqual(toNumber(depositAmount))
     })
 
 
@@ -1510,9 +1524,9 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
         const ethBalPartner = await provider.getBalance(partnerVault.address);
         expect(ethBalPartner.gt(0)).to.eq(true)
 
-        // validates that the slit is in fact correct
-        expect(fees.mul(TENK.sub(protocolFee)).toString()).to.equal(feesPartner.mul(protocolFee).toString())
-        expect(ethBal.mul(TENK.sub(protocolFee)).toString()).to.equal(ethBalPartner.mul(protocolFee).toString())
+        // validates that the split is in fact correct
+        expect(toNumber(fees.mul(TENK.sub(protocolFee)))).to.equal(toNumber(feesPartner.mul(protocolFee)))
+        expect(toNumber(ethBal.mul(TENK.sub(protocolFee)))).to.equal(toNumber(ethBalPartner.mul(protocolFee)))
     })
 
     it('ADMIN: can withdraw', async () => {
