@@ -358,9 +358,6 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer 
         return (IDataProvider(dataProvider).oToken(collateral), IDataProvider(dataProvider).oToken(debt));
     }
 
-    function getOpenAmounts() external view returns (uint256, uint256) {
-        return (ds().collateralSwapped, ds().debtSwapped);
-    }
 
     function getDetails() external pure returns (VixDetailsStorage memory details) {
         return ds();
