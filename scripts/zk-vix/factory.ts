@@ -1,16 +1,14 @@
 import '@nomiclabs/hardhat-ethers'
 import hre from 'hardhat'
-import { SlotFactoryProxy__factory, VixLens__factory, VixSlotFactory__factory } from '../../types';
+import { SlotFactoryProxy__factory, VixSlotFactory__factory } from '../../types';
 import { deltaIsolationAddresses } from './addresses';
-
-
 
 async function main() {
     const accounts = await hre.ethers.getSigners()
     const operator = accounts[0]
     const chainId = await operator.getChainId();
 
-    console.log("Deploy lens on", chainId, "by", operator.address)
+    console.log("Deploy factory on", chainId, "by", operator.address)
 
     console.log("deploy factoryProxy")
     const factoryProxy = await new SlotFactoryProxy__factory(operator).deploy()

@@ -1,7 +1,13 @@
 import '@nomiclabs/hardhat-ethers'
 import hre from 'hardhat'
 import { getSelectors, ModuleConfigAction } from '../../test/1delta/helpers/diamond';
-import { AggregatorCallbackZK__factory, DeltaModuleProvider__factory, FeeOperator__factory, VixDirect__factory, VixInitializeAggregatorZK__factory } from '../../types';
+import {
+    AggregatorCallbackZK__factory,
+    DeltaModuleProvider__factory,
+    FeeOperator__factory,
+    VixDirect__factory,
+    VixInitializeAggregatorZK__factory
+} from '../../types';
 import { deltaIsolationAddresses, WNATIVE_ADDRESS } from './addresses';
 
 async function main() {
@@ -22,7 +28,7 @@ async function main() {
     const feeOperator = await new FeeOperator__factory(operator).deploy(1000)
     await feeOperator.deployed()
     console.log("fee operator deployed")
-    console.log("feeOperator:", feeOperator)
+    console.log("feeOperator:", feeOperator.address)
 
     console.log("callback")
     const callback = await new AggregatorCallbackZK__factory(operator).deploy(
@@ -54,7 +60,7 @@ async function main() {
     console.log("direct", direct.address)
 
 
-    console.log("feeOperator:", feeOperator)
+    console.log("feeOperator:", feeOperator.address)
     console.log("callback", callback.address)
     console.log("initializer", initializer.address)
     console.log("direct", direct.address)

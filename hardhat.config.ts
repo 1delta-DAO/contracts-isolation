@@ -108,8 +108,24 @@ const config: HardhatUserConfig = {
   },
   defaultNetwork: 'hardhat',
   etherscan: {
-    apiKey: process.env.ETHERSCAN_API_KEY,
-    // apiKey: process.env.POLYGONSCAN_API_KEY,
+    customChains: [
+      {
+        network: 'polygon-zk-evm',
+        chainId: 1101,
+        urls: {
+          apiURL: 'https://api-zkevm.polygonscan.com/api',
+          browserURL: 'https://zkevm.polygonscan.com'
+        }
+      }
+
+    ],
+    // apiKey: process.env.ETHERSCAN_API_KEY,
+    // apiKey: process.env.POLYGONSCAN_ZK_API_KEY,
+    apiKey: {
+      'polygon-zk-evm': process.env.POLYGONSCAN_ZK_API_KEY ?? '',
+      // matic: process.env.POLYGONSCAN_API_KEY ?? '',
+      goerli: process.env.ETHERSCAN_API_KEY ?? '',
+    }
   },
   gasReporter: {
     coinmarketcap: process.env.COINMARKETCAP_API_KEY,
@@ -161,11 +177,11 @@ const config: HardhatUserConfig = {
     hardhat: {
       forking: {
         url: "https://zkevm-rpc.com",
-        
+
         // specify a block to fork from
         // remove if you want to fork from the last block
         blockNumber: 64682, // zkEVM main
-    }
+      }
     },
     ropsten: {
       url: `https://ropsten.infura.io/v3/${process.env.INFURA_API_KEY}`,
@@ -191,6 +207,7 @@ const config: HardhatUserConfig = {
       url: 'https://zkevm-rpc.com',
       accounts: [pk1],
       chainId: 1101,
+      live: true,
     },
     matic: {
       // url: 'https://rpc-mainnet.maticvigil.com',

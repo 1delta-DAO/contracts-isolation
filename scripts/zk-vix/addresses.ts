@@ -1,18 +1,18 @@
 
 
-export const WNATIVE_ADDRESS = ''
+export const WNATIVE_ADDRESS = '0x4F9A0e7FD2Bf6067db6994CF12E4495Df938E6e9'
 
 export const deltaIsolationAddresses = {
-    moduleProvider: '',
-    dataProvider: '',
-    feeOperator: '',
-    factoryProxy: '',
-    factoryLogic: '',
-    lens: '',
+    moduleProvider: '0x667518b0eFd52071bE34aa4f0cb6951b76dab1d6',
+    dataProvider: '0x3a69cdd907b3AfD649bb4D636E31d21A3FFF797f',
+    feeOperator: '0x600ED8507F068B1eEEF7cD13a3E9e65E0A02cB4b',
+    factoryProxy: '0xa58d5f9397fE1C65EfE72f5fBC95C1A957418F58',
+    factoryLogic: '0xF443a1F74e9eeEa693743ed23a85279fef279187',
+    lens: '0x600ED8507F068B1eEEF7cD13a3E9e65E0A02cB4b',
     // modules
-    callback: '',
-    initializer: '',
-    direct: '',
+    callback: '0xFA2cac1CacAaE741BCA20B5FAFd6E84A65Ad4C6D',
+    initializer: '0x24C19FcAf52E2Ca5FC75221326d2b4b09F466059',
+    direct: '0xaDE466aa677E4423DBfAAB4A628A5f62810F95d2',
 
 
 }

@@ -1,6 +1,6 @@
 import '@nomiclabs/hardhat-ethers'
 import hre from 'hardhat'
-import { DeltaModuleProvider__factory, VixLens__factory } from '../../types';
+import { DeltaModuleProvider__factory } from '../../types';
 
 async function main() {
     const accounts = await hre.ethers.getSigners()

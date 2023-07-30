@@ -20,6 +20,8 @@ contract DataProvider is Ownable, IDataProvider {
 
     constructor() Ownable() {}
 
+    /** Getters */
+
     function oToken(address _underlying) external view returns (address token) {
         token = _oTokens[_underlying];
         if (token == address(0)) revert InvalidUnderlying();
@@ -31,6 +33,19 @@ contract DataProvider is Ownable, IDataProvider {
 
     function oEther() external view returns (address) {
         return _oEther;
+    }
+
+    function oTokens(address _underlying, address _otherUnderlying) external view returns (address _oToken, address oTokenOther) {
+        _oToken = _oTokens[_underlying];
+        oTokenOther = _oTokens[_otherUnderlying];
+        if (_oToken == address(0)) revert InvalidUnderlying();
+        if (oTokenOther == address(0)) revert InvalidUnderlying();
+    }
+
+    function oTokenAndOEther(address _underlying) external view returns (address _oToken, address _oEth) {
+        _oToken = _oTokens[_underlying];
+        if (_oToken == address(0)) revert InvalidUnderlying();
+        _oEth = _oEther;
     }
 
     /** Setters - Only Owner can interact */
@@ -48,17 +63,5 @@ contract DataProvider is Ownable, IDataProvider {
     function setComptroller(address _newComptroller) external onlyOwner {
         _comptroller = _newComptroller;
         emit ComptrollerSet(_newComptroller);
-    }
-
-    function oTokens(address _underlying, address _otherUnderlying) external view returns (address _oToken, address oTokenOther) {
-        _oToken = _oTokens[_underlying];
-        oTokenOther = _oTokens[_otherUnderlying];
-        if (_oToken == address(0) || oTokenOther == address(0)) revert InvalidUnderlying();
-    }
-
-    function oTokenAndOEther(address _underlying) external view returns (address _oToken, address _oEth) {
-        _oToken = _oTokens[_underlying];
-        if (_oToken == address(0)) revert InvalidUnderlying();
-        _oEth = _oEther;
     }
 }

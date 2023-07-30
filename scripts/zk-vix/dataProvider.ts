@@ -8,12 +8,12 @@ async function main() {
     const operator = accounts[0]
     const chainId = await operator.getChainId();
 
-    console.log("Deploy quoter on", chainId, "by", operator.address)
+    console.log("Deploy dataProvider on", chainId, "by", operator.address)
 
-    const quoter = await new DataProvider__factory(operator).deploy()
+    const dataProvider = await new DataProvider__factory(operator).deploy()
 
     console.log('Addresses')
-    console.log('dataProvider:', quoter.address)
+    console.log('dataProvider:', dataProvider.address)
 }
 
 main()
