@@ -1017,7 +1017,7 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
         expect(toNumber(supplyPost)).to.greaterThan(toNumber(params.minimumMarginReceived.add(params.minimumAmountDeposited)))
     })
 
-    it.only('SINGLE: allows to deploy standard slot ETH collateral and close', async () => {
+    it('SINGLE: allows to deploy standard slot ETH collateral and close', async () => {
 
         const borrowIndex = 0
         const depositAmount = expandTo18Decimals(10)
