@@ -44,7 +44,7 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer 
     /**
      * @dev Initializes with ERC20 deposit - can swap to WETH and deposit ETH
      */
-    function initialize(address owner, InitParams calldata params) external payable virtual {
+    function initialize(address owner, InitParams calldata params) external payable {
         VixDetailsStorage memory details = ds();
         address dataProvider = DATA_PROVIDER;
         if (details.initialized != 0) revert AlreadyInitialized();
@@ -114,7 +114,7 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer 
     /**
      * @dev initialize with ETH deposit
      */
-    function initializeETH(address owner, InitParams calldata params) external payable virtual {
+    function initializeETH(address owner, InitParams calldata params) external payable {
         VixDetailsStorage memory details = ds();
         address dataProvider = DATA_PROVIDER;
         if (details.initialized != 0) revert AlreadyInitialized();
@@ -174,7 +174,7 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer 
     /**
      * @dev Allows creation of position with permit (e.g. DAI, USDC etc.)
      */
-    function initializeWithPermit(InitParamsWithPermit calldata params) external payable virtual {
+    function initializeWithPermit(InitParamsWithPermit calldata params) external payable {
         VixDetailsStorage memory details = ds();
         address dataProvider = DATA_PROVIDER;
         if (details.initialized != 0) revert AlreadyInitialized();
@@ -269,43 +269,44 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer 
         address partner,
         uint32 fee,
         bytes memory path
-    ) public payable virtual returns (uint256 amountIn) {
+    ) public payable {
         // efficient OnlyOwner() check
         address owner = ads().owner;
         require(msg.sender == owner, "OnlyOwner()");
-
-        address tokenIn; // the token that shares a pool with borrow
-        address tokenOut; // token out MUST be borrow token
-        uint24 poolFee;
         address native = NATIVE_WRAPPER;
-        assembly {
-            tokenOut := div(mload(add(add(path, 0x20), 0)), 0x1000000000000000000000000)
-            poolFee := mload(add(add(path, 0x3), 20))
-            tokenIn := div(mload(add(add(path, 0x20), 24)), 0x1000000000000000000000000)
-        }
         // if repay amount is set to 0, the full borrow balance will be repaid
         bool partFlag = amountToRepay != 0;
         // avoid stack too deep
         {
+            address tokenIn; // the token that shares a pool with borrow
+            address tokenOut; // token out MUST be borrow token
+            uint24 poolFee;
+            uint8 pId;
+            assembly {
+                tokenOut := div(mload(add(add(path, 0x20), 0)), 0x1000000000000000000000000)
+                poolFee := mload(add(add(path, 0x3), 20))
+                pId := mload(add(add(path, 0x1), 23))
+                tokenIn := div(mload(add(add(path, 0x20), 25)), 0x1000000000000000000000000)
+            }
             uint256 amountOut = partFlag
                 ? amountToRepay
                 : ICompoundTypeCERC20(tokenOut == native ? IDataProvider(DATA_PROVIDER).oEther() : IDataProvider(DATA_PROVIDER).oToken(tokenOut))
                     .borrowBalanceCurrent(address(this));
 
             bool zeroForOne = tokenIn < tokenOut;
-            _toPool(tokenIn, poolFee, tokenOut).swap(
+            _toPool(tokenIn, poolFee, pId, tokenOut).swap(
                 address(this),
                 zeroForOne,
                 -amountOut.toInt256(),
                 zeroForOne ? MIN_SQRT_RATIO : MAX_SQRT_RATIO,
                 path
             );
-        }
 
-        // fetch amount in and clean cache
-        amountIn = cs().amount;
-        cs().amount = DEFAULT_AMOUNT_CACHED;
-        if (amountInMaximum < amountIn) revert Slippage();
+            // fetch amount in and clean cache
+            uint256 amountIn = cs().amount;
+            cs().amount = DEFAULT_AMOUNT_CACHED;
+            if (amountInMaximum < amountIn) revert Slippage();
+        }
 
         // when everything is repaid, the amount is withdrawn to the owner
         if (!partFlag) {
@@ -325,15 +326,17 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer 
         address tokenIn;
         address tokenOut;
         uint24 fee;
+        uint8 pId;
 
         assembly {
             tokenIn := div(mload(add(add(path, 0x20), 0)), 0x1000000000000000000000000)
             fee := mload(add(add(path, 0x3), 20))
-            tokenOut := div(mload(add(add(path, 0x20), 24)), 0x1000000000000000000000000)
+            pId := mload(add(add(path, 0x1), 23))
+            tokenOut := div(mload(add(add(path, 0x20), 25)), 0x1000000000000000000000000)
         }
 
         bool zeroForOne = tokenIn < tokenOut;
-        _toPool(tokenIn, fee, tokenOut).swap(
+        _toPool(tokenIn, fee, pId, tokenOut).swap(
             address(this),
             zeroForOne,
             uint256(amountIn).toInt256(),
@@ -357,7 +360,6 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer 
 
         return (IDataProvider(dataProvider).oToken(collateral), IDataProvider(dataProvider).oToken(debt));
     }
-
 
     function getDetails() external pure returns (VixDetailsStorage memory details) {
         return ds();

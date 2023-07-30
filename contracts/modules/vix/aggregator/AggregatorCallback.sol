@@ -63,20 +63,21 @@ contract AggregatorCallback is BaseAggregator, TokenTransfer, WithVixStorage {
         int256 amount1Delta,
         bytes memory data
     ) private {
-        // create datacopy to memory
         uint8 tradeType;
         address tokenIn;
         address tokenOut;
         uint24 fee;
+        uint8 pId;
         assembly {
             tokenIn := div(mload(add(add(data, 0x20), 0)), 0x1000000000000000000000000)
             fee := mload(add(add(data, 0x3), 20))
-            tradeType := mload(add(add(data, 0x1), 23))
-            tokenOut := div(mload(add(add(data, 0x20), 24)), 0x1000000000000000000000000)
+            pId := mload(add(add(data, 0x1), 23))
+            tradeType := mload(add(add(data, 0x1), 24))
+            tokenOut := div(mload(add(add(data, 0x20), 25)), 0x1000000000000000000000000)
         }
 
         {
-            require(msg.sender == address(_toPool(tokenIn, fee, tokenOut)), "Inavlid Callback");
+            require(msg.sender == address(_toPool(tokenIn, fee, pId, tokenOut)), "Inavlid Callback");
         }
         // regular exact input
         if (tradeType == 3) {
@@ -88,7 +89,7 @@ contract AggregatorCallback is BaseAggregator, TokenTransfer, WithVixStorage {
             (uint256 amountToBorrow, uint256 amountToSupply) = amount0Delta > 0
                 ? (uint256(amount0Delta), uint256(-amount1Delta))
                 : (uint256(amount1Delta), uint256(-amount0Delta));
-            if (data.length > 68) {
+            if (data.length > 69) {
                 // we need to swap to the token that we want to supply
                 // the router returns the amount that we can finally supply to the protocol
                 data = skipToken(data);
@@ -163,7 +164,7 @@ contract AggregatorCallback is BaseAggregator, TokenTransfer, WithVixStorage {
             }
             // multi pool means that we have to nest swaps and then withdraw and
             // repay the swap pool
-            if (data.length > 68) {
+            if (data.length > 69) {
                 // we then swap exact In where the first amount is
                 // withdrawn from the lending protocol pool and paid back to the pool
                 data = skipToken(data);
@@ -171,11 +172,12 @@ contract AggregatorCallback is BaseAggregator, TokenTransfer, WithVixStorage {
                 assembly {
                     tokenOut := div(mload(add(add(data, 0x20), 0)), 0x1000000000000000000000000)
                     fee := mload(add(add(data, 0x3), 20))
-                    tokenIn := div(mload(add(add(data, 0x20), 24)), 0x1000000000000000000000000)
+                    pId := mload(add(add(data, 0x1), 23))
+                    tokenIn := div(mload(add(add(data, 0x20), 25)), 0x1000000000000000000000000)
                 }
 
                 bool zeroForOne = tokenIn < tokenOut;
-                _toPool(tokenIn, fee, tokenOut).swap(
+                _toPool(tokenIn, fee, pId, tokenOut).swap(
                     msg.sender,
                     zeroForOne,
                     -amountToWithdraw.toInt256(),
@@ -188,9 +190,8 @@ contract AggregatorCallback is BaseAggregator, TokenTransfer, WithVixStorage {
                 cs().amount = uint128(amountToWithdraw);
                 // tradeType now indicates whethr it is partial repay or full
                 assembly {
-                    tradeType := mload(add(add(data, 0x1), 68)) // will only be used in last hop
+                    tradeType := mload(add(add(data, 0x1), 45)) // will only be used in last hop
                 }
-
                 if (tokenOut == NATIVE_WRAPPER) {
                     ICompoundTypeCEther cEtherContract = ICompoundTypeCEther(IDataProvider(DATA_PROVIDER).oEther());
                     if (tradeType != 0) {
@@ -221,18 +222,19 @@ contract AggregatorCallback is BaseAggregator, TokenTransfer, WithVixStorage {
             // multi swap exact out
             uint256 amountToPay = amount0Delta > 0 ? uint256(amount0Delta) : uint256(amount1Delta);
             // if more pools are provided, we continue the swap
-            if (data.length > 68) {
+            if (data.length > 69) {
                 data = skipToken(data);
                 // decode first pool, out first, then in
                 assembly {
                     tokenOut := div(mload(add(add(data, 0x20), 0)), 0x1000000000000000000000000)
                     fee := mload(add(add(data, 0x3), 20))
-                    tokenIn := div(mload(add(add(data, 0x20), 24)), 0x1000000000000000000000000)
+                    pId := mload(add(add(data, 0x1), 23))
+                    tokenIn := div(mload(add(add(data, 0x20), 25)), 0x1000000000000000000000000)
                 }
 
                 bool zeroForOne = tokenIn < tokenOut;
 
-                _toPool(tokenIn, fee, tokenOut).swap(
+                _toPool(tokenIn, fee, pId, tokenOut).swap(
                     msg.sender,
                     zeroForOne,
                     -amountToPay.toInt256(),
@@ -242,7 +244,7 @@ contract AggregatorCallback is BaseAggregator, TokenTransfer, WithVixStorage {
             } else {
                 // tradeType now indicates whethr it is partial repay or full
                 assembly {
-                    tradeType := mload(add(add(data, 0x1), 44)) // will only be used in last hop
+                    tradeType := mload(add(add(data, 0x1), 45)) // will only be used in last hop
                 }
                 // withraw and send funds to the pool
                 if (tokenOut == NATIVE_WRAPPER) {
@@ -257,7 +259,7 @@ contract AggregatorCallback is BaseAggregator, TokenTransfer, WithVixStorage {
 
                     INativeWrapper(tokenOut).deposit{value: amountToPay}(); // wrap
                     // transfer WETH
-                    IERC20(tokenOut).transfer(msg.sender, amountToPay);
+                    _transferERC20Tokens(tokenOut, msg.sender, amountToPay);
                 } else {
                     ICompoundTypeCERC20 cTokenContract = ICompoundTypeCERC20(IDataProvider(DATA_PROVIDER).oToken(tokenOut));
                     // withdraw regular ERC20
@@ -267,7 +269,7 @@ contract AggregatorCallback is BaseAggregator, TokenTransfer, WithVixStorage {
                         cTokenContract.redeem(cTokenContract.balanceOf(address(this)));
                     }
                     // repay ERC20
-                    IERC20(tokenOut).transfer(msg.sender, amountToPay);
+                    _transferERC20Tokens(tokenOut, msg.sender, amountToPay);
                 }
             }
             // cache amount

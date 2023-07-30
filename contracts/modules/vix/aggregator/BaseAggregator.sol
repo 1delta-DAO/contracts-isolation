@@ -37,20 +37,21 @@ abstract contract BaseAggregator {
     }
 
     function skipToken(bytes memory path) internal pure returns (bytes memory) {
-        return path.slice(24, path.length - 24);
+        return path.slice(25, path.length - 25);
     }
 
     function getFirstPool(bytes memory path) internal pure returns (bytes memory) {
-        return path.slice(0, 44);
+        return path.slice(0, 45);
     }
 
     // Compute the pool address given two tokens and a fee.
     function _toPool(
         address inputToken,
         uint24 fee,
+        uint8 pId,
         address outputToken
     ) internal view returns (IUniswapV3Pool pool) {
-        if (fee != 0) {
+        if (pId != 0) {
             // Uniswap V3
             bytes32 ffFactoryAddress = DOV_FF_FACTORY_ADDRESS;
             bytes32 poolInitCodeHash = DOV_POOL_INIT_CODE_HASH;
@@ -94,17 +95,19 @@ abstract contract BaseAggregator {
         while (true) {
             bytes memory exactInputData = getFirstPool(data);
             address tokenIn;
-            bool multiPool = data.length > 68;
+
             address tokenOut;
             uint24 fee;
+            uint8 pId;
             assembly {
                 tokenIn := div(mload(add(add(exactInputData, 0x20), 0)), 0x1000000000000000000000000)
                 fee := mload(add(add(exactInputData, 0x3), 20))
-                tokenOut := div(mload(add(add(exactInputData, 0x20), 24)), 0x1000000000000000000000000)
+                pId := mload(add(add(exactInputData, 0x1), 23))
+                tokenOut := div(mload(add(add(exactInputData, 0x20), 25)), 0x1000000000000000000000000)
             }
 
             bool zeroForOne = tokenIn < tokenOut;
-            (int256 amount0, int256 amount1) = _toPool(tokenIn, fee, tokenOut).swap(
+            (int256 amount0, int256 amount1) = _toPool(tokenIn, fee, pId, tokenOut).swap(
                 address(this),
                 zeroForOne,
                 amountIn.toInt256(),
@@ -113,9 +116,9 @@ abstract contract BaseAggregator {
             );
 
             amountIn = uint256(-(zeroForOne ? amount1 : amount0));
-
+            zeroForOne = data.length > 68;
             // decide whether to continue or terminate
-            if (multiPool) {
+            if (zeroForOne) {
                 data = skipToken(data);
             } else {
                 amountOut = amountIn;
