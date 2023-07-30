@@ -1571,7 +1571,6 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
     })
 
     it('ADMIN: can withdraw', async () => {
-        let fees = ZERO;
         for (let i = 0; i < tokenData.tokens.length; i++) {
             const bal = await tokenData.tokens[i].balanceOf(feeOperator.address)
             if (bal.gt(0)) {
@@ -1586,6 +1585,13 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
         }
         const ethBalPost = await provider.getBalance(feeOperator.address);
         expect(ethBalPost.eq(0)).to.eq(true)
+    })
+
+    it('SLOT & FACTORY: transfer is protected', async () => {
+        const data = await lens.callStatic.getUserSlots(alice.address, factory.address)
+        const slot = await new VixDirect__factory(bob).attach(data[0].slot)
+        await expect(slot.transferSlot(bob.address)).to.be.revertedWith('OnlyOwner()')
+        await expect(factory.connect(bob).registerChange(alice.address, bob.address)).to.be.revertedWith('Slot not contained')
     })
 
     it('LENS: shows slots', async () => {

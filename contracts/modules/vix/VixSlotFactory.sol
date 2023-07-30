@@ -105,10 +105,14 @@ contract VixSlotFactory is SlotFactoryStorage {
         return userSlots[_user].at(_id);
     }
 
+    function getSlotId(address _user) external view returns (uint256) {
+        return slotIds[_user];
+    }
+
     function getSlotCount(address _user) external view returns (uint256) {
         return userSlots[_user].values().length;
     }
-    
+
     /**
      * Allows the admin change to a new admin
      */
@@ -125,16 +129,12 @@ contract VixSlotFactory is SlotFactoryStorage {
      * Register the change of ownership in the factory.
      * Can only be called by a slot through the user.
      */
-    function registerChange(
-        address owner,
-        address newOwner
-    ) external {
-        address _owner = owner; // save gas
+    function registerChange(address owner, address newOwner) external {
         // makes sure that a slot is the caller
         address slot = msg.sender;
-        // remove from original owner 
+        // remove from original owner
         // -> the call would return false if the slot was not contained
-        require(userSlots[_owner].remove(slot), "Slot not contained");
+        require(userSlots[owner].remove(slot), "Slot not contained");
         // addd to new owner
         userSlots[newOwner].add(slot);
     }
