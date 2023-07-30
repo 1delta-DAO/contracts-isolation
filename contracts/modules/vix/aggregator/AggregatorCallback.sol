@@ -35,9 +35,11 @@ contract AggregatorCallback is BaseAggregator, TokenTransfer, WithVixStorage {
     constructor(
         address _algebraDeployer,
         address _doveFactory,
+        bytes32 algHash,
+        bytes32 doveHash,
         address _dataProvider,
         address _weth
-    ) BaseAggregator(_algebraDeployer, _doveFactory) {
+    ) BaseAggregator(_algebraDeployer, _doveFactory, algHash, doveHash) {
         DATA_PROVIDER = _dataProvider;
         NATIVE_WRAPPER = _weth;
     }

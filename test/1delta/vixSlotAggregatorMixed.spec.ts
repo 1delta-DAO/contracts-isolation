@@ -45,6 +45,10 @@ const toNumber = (n: BigNumber | string) => {
     return Number(formatEther(n))
 }
 
+const ALG_POOL_CODE_HASH = '0x15b69bf972c5c2df89dd7772b62e872d4048b3741a214df60be904ec5620d9df';
+const DOV_POOL_INIT_CODE_HASH = '0xe34f199b19b2b4f47f68442619d555527d244f78a3297ea89325f843f87b8b54';
+
+
 // Tests all configurations for the minimal slot variant
 describe('Diamond Slot aggregation trading via data provider', async () => {
     let deployer: SignerWithAddress, alice: SignerWithAddress, bob: SignerWithAddress, carol: SignerWithAddress;
@@ -139,12 +143,16 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
         callback = await new AggregatorCallback__factory(deployer).deploy(
             algebra.poolDeployer.address,
             uniswap.factory.address,
+            ALG_POOL_CODE_HASH,
+            DOV_POOL_INIT_CODE_HASH,
             dataProvider.address,
             tokenData.wnative.address
         )
         initializer = await new VixInitializeAggregator__factory(deployer).deploy(
             algebra.poolDeployer.address,
             uniswap.factory.address,
+            ALG_POOL_CODE_HASH,
+            DOV_POOL_INIT_CODE_HASH,
             dataProvider.address,
             tokenData.wnative.address,
             feeOperator.address

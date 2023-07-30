@@ -31,10 +31,12 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer 
     constructor(
         address _algebraDeployer,
         address _doveFactory,
+        bytes32 algHash,
+        bytes32 doveHash,
         address _dataProvider,
         address _weth,
         address _feeCollector
-    ) BaseAggregator(_algebraDeployer, _doveFactory) FeeTransfer(_feeCollector) {
+    ) BaseAggregator(_algebraDeployer, _doveFactory, algHash, doveHash) FeeTransfer(_feeCollector) {
         DATA_PROVIDER = _dataProvider;
         NATIVE_WRAPPER = _weth;
     }

@@ -10,9 +10,7 @@ export const deltaIsolationAddresses = {
     factoryLogic: '0xF443a1F74e9eeEa693743ed23a85279fef279187',
     lens: '0x600ED8507F068B1eEEF7cD13a3E9e65E0A02cB4b',
     // modules
-    callback: '0xFA2cac1CacAaE741BCA20B5FAFd6E84A65Ad4C6D',
-    initializer: '0x24C19FcAf52E2Ca5FC75221326d2b4b09F466059',
+    callback: '0x85F7540BaDC6D22c748367aBFe4F51e4837793f1',
+    initializer: '0xC977656F90Aa682688e7B0550F2A32D0D6c3cA18',
     direct: '0xaDE466aa677E4423DBfAAB4A628A5f62810F95d2',
-
-
 }
