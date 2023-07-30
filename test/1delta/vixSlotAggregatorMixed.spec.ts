@@ -4,8 +4,6 @@ import { expect } from './shared/expect'
 import { CompoundFixture, CompoundOptions, generateCompoundFixture, ONE_18, ZERO } from './shared/compoundFixture'
 import {
     ERC20Mock__factory,
-    OVixLensZK__factory,
-    OVixLensZK,
     FiatWithPermit,
     DeltaModuleProvider,
     DeltaModuleProvider__factory,
@@ -21,7 +19,9 @@ import {
     AggregatorCallback__factory,
     VixInitializeAggregator__factory,
     FeeOperator,
-    FeeOperator__factory
+    FeeOperator__factory,
+    VixLens__factory,
+    VixLens
 } from '../../types';
 import { BigNumber, constants } from 'ethers';
 import { expandTo18Decimals } from '../uniswap-v3/core/shared/utilities';
@@ -55,7 +55,7 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
     let algebra: AlgebraFixture
     let tokenData: TokenFixture
     let provider: MockProvider
-    let lens: OVixLensZK
+    let lens: VixLens
     let moduleProvider: DeltaModuleProvider
     let factory: VixSlotFactory
     let factoryImplementation: VixSlotFactory
@@ -131,7 +131,7 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
 
         partnerVault = await new FeeOperator__factory(partner).deploy(0)
 
-        lens = await new OVixLensZK__factory(deployer).deploy()
+        lens = await new VixLens__factory(deployer).deploy()
         feeOperator = await new FeeOperator__factory(deployer).deploy(protocolFee)
 
         moduleProvider = await new DeltaModuleProvider__factory(deployer).deploy()
@@ -1590,6 +1590,7 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
 
     it('LENS: shows slots', async () => {
         const data = await lens.callStatic.getUserSlots(alice.address, factory.address)
+        // console.log(data)
         expect(data.length).to.greaterThanOrEqual(1)
     })
 })
@@ -1611,7 +1612,7 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
 
 // w fee
 // ···········································································|··········································|·············|·············|···········|···············|··············
-// |  VixSlotFactory                                                          ·  createSlot                              ·     853874  ·    1212350  ·  1008561  ·           14  ·      26.49  │
+// |  VixSlotFactory                                                          ·  createSlot                              ·     853874  ·    1212011  ·  1008384  ·           14  ·      34.02  │
 // ···········································································|··········································|·············|·············|···········|···············|··············
-// |  VixSlotFactory                                                          ·  createSlotWithPermit                    ·    1046654  ·    1249110  ·  1151728  ·            4  ·      30.25  │
+// |  VixSlotFactory                                                          ·  createSlotWithPermit                    ·    1046202  ·    1248658  ·  1151389  ·            4  ·      38.85  │
 // ···········································································|··········································|·············|·············|···········|···············|··············

@@ -82,7 +82,7 @@ contract AggregatorCallback is BaseAggregator, TokenTransfer, WithVixStorage {
         // regular exact input
         if (tradeType == 3) {
             uint256 amountToPay = amount0Delta > 0 ? uint256(amount0Delta) : uint256(amount1Delta);
-            IERC20(tokenIn).transfer(msg.sender, amountToPay);
+            _transferERC20Tokens(tokenIn, msg.sender, amountToPay);
         }
         // OPEN EXACT IN
         else if (tradeType == 0) {
@@ -203,7 +203,7 @@ contract AggregatorCallback is BaseAggregator, TokenTransfer, WithVixStorage {
                     // withdraw WETH
                     INativeWrapper(tokenOut).deposit{value: amountToWithdraw}(); // unwrap
                     // transfer WETH
-                    IERC20(tokenOut).transfer(msg.sender, amountToWithdraw);
+                    _transferERC20Tokens(tokenOut, msg.sender, amountToWithdraw);
                 } else {
                     ICompoundTypeCERC20 cTokenContract = ICompoundTypeCERC20(IDataProvider(DATA_PROVIDER).oToken(tokenOut));
                     if (tradeType != 0) {
@@ -213,7 +213,7 @@ contract AggregatorCallback is BaseAggregator, TokenTransfer, WithVixStorage {
                         cTokenContract.redeem(cTokenContract.balanceOf(address(this)));
                     }
                     // repay ERC20
-                    IERC20(tokenOut).transfer(msg.sender, amountToWithdraw);
+                    _transferERC20Tokens(tokenOut, msg.sender, amountToWithdraw);
                 }
             }
         }

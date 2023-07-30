@@ -95,7 +95,6 @@ abstract contract BaseAggregator {
         while (true) {
             bytes memory exactInputData = getFirstPool(data);
             address tokenIn;
-
             address tokenOut;
             uint24 fee;
             uint8 pId;

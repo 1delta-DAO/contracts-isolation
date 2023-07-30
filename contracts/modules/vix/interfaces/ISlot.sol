@@ -2,6 +2,8 @@
 
 pragma solidity ^0.8.21;
 
+import {VixDetailsStorage, GeneralStorage} from "../VixStorage.sol";
+
 struct InitParams {
     // deposit amounts
     uint128 amountDeposited;
@@ -63,7 +65,13 @@ interface ISlot {
 
     function repay(uint256 amount) external payable;
 
-    function withdraw(uint256 amount, bool useCTokens) external payable;
+    function withdraw(uint256 amount, bool useCollateralTokens) external payable;
 
     function getOwner() external view returns (address);
+
+    function getDetails() external pure returns (VixDetailsStorage memory details);
+
+    function getGeneral() external pure returns (GeneralStorage memory details);
+
+    function getOTokens() external view returns (address collateralToken, address collateralTokenBorrow);
 }
