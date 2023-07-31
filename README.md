@@ -2,7 +2,7 @@
 
 Alows margin trading that aggregates through UniswapV3 and Algebra's V3.
 
-Creates UUPS Upgradeable contracts as "Slots"
+Creates UUPS Upgradeable / Diamond contracts as "Slots"
 
 These slots are holding the user's baances.
 
