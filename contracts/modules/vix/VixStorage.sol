@@ -58,7 +58,7 @@ library LibStorage {
         }
     }
     function detailsStorage() internal pure returns (VixDetailsStorage storage ads) {
-        bytes32 position = ADMIN_STORAGE;
+        bytes32 position = DETAILS_STORAGE;
         assembly {
             ads.slot := position
         }

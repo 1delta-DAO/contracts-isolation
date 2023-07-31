@@ -22,9 +22,11 @@ async function main() {
 
     const initSelectors = await moduleProvider.moduleFunctionSelectors(deltaIsolationAddresses.initializer)
     const callbackSelectors = await moduleProvider.moduleFunctionSelectors(deltaIsolationAddresses.callback)
+    const directSelectors = await moduleProvider.moduleFunctionSelectors(deltaIsolationAddresses.direct)
     const moduleSelectors = [
         initSelectors,
-        callbackSelectors
+        callbackSelectors,
+        directSelectors
     ]
 
     const cut: {

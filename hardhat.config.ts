@@ -180,7 +180,7 @@ const config: HardhatUserConfig = {
 
         // specify a block to fork from
         // remove if you want to fork from the last block
-        blockNumber: 3467141, // zkEVM main
+        blockNumber: 3474036, // zkEVM main
       }
     },
     ropsten: {

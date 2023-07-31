@@ -310,6 +310,10 @@ contract VixLens {
         // ownership & slot
         slotData.owner = ISlot(slot).getOwner();
         slotData.slot = slot;
+
+        // times
+        slotData.creationTime = details.creationTime;
+        slotData.closeTime = details.closeTime;
     }
 
     function add(

@@ -4,6 +4,7 @@ import { getSelectors, ModuleConfigAction } from '../../test/1delta/helpers/diam
 import {
     AggregatorCallback__factory,
     DeltaModuleProvider__factory,
+    VixDirect__factory,
     VixInitializeAggregator__factory
 } from '../../types';
 import { deltaIsolationAddresses, WNATIVE_ADDRESS } from './addresses';
@@ -57,8 +58,18 @@ async function main() {
     console.log("initializer deployed")
     console.log("initializer", initializer.address)
 
+    console.log("direct")
+    const direct = await new VixDirect__factory(operator).deploy(
+        deltaIsolationAddresses.dataProvider,
+        WNATIVE_ADDRESS,
+        deltaIsolationAddresses.factoryProxy
+    )
+    await direct.deployed()
+    console.log("direct deployed")
+    console.log("direct", direct.address)
 
 
+    console.log("direct", direct.address)
     console.log("callback", callback.address)
     console.log("initializer", initializer.address)
 
@@ -74,6 +85,11 @@ async function main() {
                 moduleAddress: initializer.address,
                 action: ModuleConfigAction.Add,
                 functionSelectors: getSelectors(initializer)
+            },
+            {
+                moduleAddress: direct.address,
+                action: ModuleConfigAction.Add,
+                functionSelectors: getSelectors(direct)
             },
         ]
     )
