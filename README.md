@@ -11,7 +11,7 @@ The slot consits of any pair available in the lender.
 User can pay in any currency.
 
 
-# New implementation with Swap aggragation
+# New implementation with Swap Aggregation
 
 The directory `contracts/modules/vix/aggregator` containes a variant using Diamond-like proxies, more specifically, 
 the proxy `contracts/proxies/SlotProxy.sol` to enable maximum functionality at the same cost compared to smaller proxies.
