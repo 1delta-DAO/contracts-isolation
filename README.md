@@ -1,6 +1,6 @@
 # Margin trading in slots by 1delta
 
-Alows margin trading that aggregates throuh UniswapV3 and Algebra's V3.
+Alows margin trading that aggregates through UniswapV3 and Algebra's V3.
 
 Creates UUPS Upgradeable contracts as "Slots"
 
@@ -15,6 +15,12 @@ User can pay in any currency.
 
 The directory `contracts/modules/vix/aggregator` containes a variant using Diamond-like proxies, more specifically, 
 the proxy `contracts/proxies/SlotProxy.sol` to enable maximum functionality at the same cost compared to smaller proxies.
+
+The currently used modules are:
+
+- `contracts/modules/vix/aggregator/AggregatorCallback.sol`: The callback implementation for flash swaps;
+- `contracts/modules/vix/aggregator/VixInitializeAggregator.sol`: Initializationa nd closing interface for slots;
+- `contracts/modules/vix/VixDirect.sol`: Direct transfer, sweep, withdrawal and repayment interface.
 
 A full set of tests is here `test/1delta/vixSlotAggregatorMixed.spec.ts`. Fee handling is implemented in `contracts/modules/FeeOperator.sol` and tested in `test/1delta/feeOperator.spec.ts`
 
