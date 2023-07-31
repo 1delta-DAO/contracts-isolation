@@ -7,7 +7,6 @@ import {BytesLib} from "../../../dex-tools/uniswap/libraries/BytesLib.sol";
 import {SafeCast} from "../../../dex-tools/uniswap/libraries/SafeCast.sol";
 import {TransferHelper} from "../../../dex-tools/uniswap/libraries/TransferHelper.sol";
 import {PoolAddressCalculator} from "../../../dex-tools/uniswap/libraries/PoolAddressCalculator.sol";
-import {DexData} from "../../../utils/base/DexData.sol";
 import {INativeWrapper} from "../../../interfaces/INativeWrapper.sol";
 import {IERC20} from "../../../external-protocols/openzeppelin/token/ERC20/IERC20.sol";
 import {ICompoundTypeCEther, ICompoundTypeCERC20, IDataProvider} from "../data-provider/IDataProvider.sol";

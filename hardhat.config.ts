@@ -183,26 +183,6 @@ const config: HardhatUserConfig = {
         blockNumber: 3476159, // zkEVM main
       }
     },
-    ropsten: {
-      url: `https://ropsten.infura.io/v3/${process.env.INFURA_API_KEY}`,
-      accounts,
-      chainId: 3,
-      live: true,
-      saveDeployments: true,
-      tags: ['staging'],
-      gasPrice: 5000000000,
-      gasMultiplier: 2,
-    },
-    rinkeby: {
-      url: `https://rinkeby.infura.io/v3/${process.env.INFURA_API_KEY}`,
-      accounts,
-      chainId: 4,
-      live: true,
-      saveDeployments: true,
-      tags: ['staging'],
-      gasPrice: 5000000000,
-      gasMultiplier: 2,
-    },
     'polygon-zk-evm': {
       url: 'https://zkevm-rpc.com',
       accounts: [pk1],
@@ -265,22 +245,6 @@ const config: HardhatUserConfig = {
       // gas: 800000000,
       // gasPrice: 25000000000,
     },
-    okex: {
-      url: 'https://exchainrpc.okex.org',
-      accounts,
-      chainId: 66,
-      live: true,
-      saveDeployments: true,
-    },
-    'okex-testnet': {
-      url: 'https://exchaintestrpc.okex.org',
-      accounts,
-      chainId: 65,
-      live: true,
-      saveDeployments: true,
-      tags: ['staging'],
-      gasMultiplier: 2,
-    },
     arbitrum: {
       url: 'https://arb1.arbitrum.io/rpc',
       accounts,
@@ -297,13 +261,6 @@ const config: HardhatUserConfig = {
       saveDeployments: true,
       tags: ['staging'],
       gasMultiplier: 2,
-    },
-    celo: {
-      url: 'https://forno.celo.org',
-      accounts,
-      chainId: 42220,
-      live: true,
-      saveDeployments: true,
     },
   },
   paths: {
