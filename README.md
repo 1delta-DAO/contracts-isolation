@@ -11,7 +11,25 @@ The slot consits of any pair available in the lender.
 User can pay in any currency.
 
 
-# Implementation for Compound V2 (and forks)
+# New implementation with Swap aggragation
+
+The directory `contracts/modules/vix/aggregator` containes a variant using Diamond-like proxies, more specifically, 
+the proxy `contracts/proxies/SlotProxy.sol` to enable maximum functionality at the same cost compared to smaller proxies.
+
+A full set of tests is here `test/1delta/vixSlotAggregatorMixed.spec.ts`. Fee handling is implemented in `contracts/modules/FeeOperator.sol` and tested in `test/1delta/feeOperator.spec.ts`
+
+- `npx hardhat test test/1delta/vixSlotAggregatorMixed.spec.ts`
+- `npx hardhat test test/1delta/feeOperator.spec.ts`
+
+Live deployment addresses on Polygon zkEVM are here: `scripts/zk-vix/addresses.ts`.
+
+As of right now, DoveSwap and Quickswap can be aggregated for optimal swaps.
+
+Flexible path parameters allow all sotrs of transactions connected with Flash Swaps.
+
+# Old Contracts
+
+## Implementation for Compound V2 (and forks)
 
 An implementation compatible with Compound V2 style cTokens is also available.
 
@@ -23,7 +41,7 @@ Transactions can fail via "ran out of gas" due to issues with hardhat.
 
 The Polygon zkEVM live version is located in `contracts/slots-simple/zk-evm`, the related facory is `FlexSlotFactory`.
 
-# General Version
+## General Version
 
 A version that allows multiple DEXs is included in `contracts/utils/AlgebraSwapper.sol`. To test this one, just run
 
