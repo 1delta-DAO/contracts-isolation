@@ -45,13 +45,12 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer 
      * @dev Initializes with ERC20 deposit - can swap to WETH and deposit ETH
      */
     function initialize(address owner, InitParams calldata params) external payable {
-        VixDetailsStorage memory details = ds();
         address dataProvider = DATA_PROVIDER;
-        if (details.initialized != 0) revert AlreadyInitialized();
-        details.initialized = 1;
+        if (ds().initialized != 0) revert AlreadyInitialized();
+        ds().initialized = 1;
         bytes memory _bytes = params.swapPath;
         address _tokenCollateral;
-        details.creationTime = uint32(block.timestamp % 2**32);
+        ds().creationTime = uint32(block.timestamp % 2**32);
         // fetch token
         assembly {
             _tokenCollateral := div(mload(add(add(_bytes, 0x20), 0)), 0x1000000000000000000000000)
@@ -104,10 +103,10 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer 
         // set owner
         ads().owner = owner;
         uint128 borrowAmount = params.borrowAmount;
-        details.debtSwapped = uint112(borrowAmount);
+        ds().debtSwapped = uint112(borrowAmount);
         // margin swap
         uint128 _received = _openPosition(borrowAmount, params.marginPath);
-        details.collateralSwapped = uint112(_received);
+        ds().collateralSwapped = uint112(_received);
         if (_received < params.minimumMarginReceived) revert Slippage();
     }
 
@@ -115,14 +114,13 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer 
      * @dev initialize with ETH deposit
      */
     function initializeETH(address owner, InitParams calldata params) external payable {
-        VixDetailsStorage memory details = ds();
         address dataProvider = DATA_PROVIDER;
-        if (details.initialized != 0) revert AlreadyInitialized();
-        details.initialized = 1;
+        if (ds().initialized != 0) revert AlreadyInitialized();
+        ds().initialized = 1;
 
         bytes memory _bytes = params.swapPath;
         address _tokenCollateral;
-        details.creationTime = uint32(block.timestamp % 2**32);
+        ds().creationTime = uint32(block.timestamp % 2**32);
 
         // fetch token
         assembly {
@@ -164,10 +162,10 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer 
         // set owner
         ads().owner = owner;
         uint128 borrowAmount = params.borrowAmount;
-        details.debtSwapped = uint112(borrowAmount);
+        ds().debtSwapped = uint112(borrowAmount);
         // margin swap
         uint128 _received = _openPosition(borrowAmount, params.marginPath);
-        details.collateralSwapped = uint112(_received);
+        ds().collateralSwapped = uint112(_received);
         if (_received < params.minimumMarginReceived) revert Slippage();
     }
 
@@ -175,14 +173,13 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer 
      * @dev Allows creation of position with permit (e.g. DAI, USDC etc.)
      */
     function initializeWithPermit(InitParamsWithPermit calldata params) external payable {
-        VixDetailsStorage memory details = ds();
         address dataProvider = DATA_PROVIDER;
-        if (details.initialized != 0) revert AlreadyInitialized();
-        details.initialized = 1;
+        if (ds().initialized != 0) revert AlreadyInitialized();
+        ds().initialized = 1;
 
         bytes memory _bytes = params.swapPath;
         address _tokenCollateral;
-        details.creationTime = uint32(block.timestamp % 2**32);
+        ds().creationTime = uint32(block.timestamp % 2**32);
 
         // fetch token
         assembly {
@@ -252,10 +249,10 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer 
         // set owner
         ads().owner = owner;
         uint128 borrowAmount = params.borrowAmount;
-        details.debtSwapped = uint112(borrowAmount);
+        ds().debtSwapped = uint112(borrowAmount);
         // margin swap
         uint128 _received = _openPosition(borrowAmount, params.marginPath);
-        details.collateralSwapped = uint112(_received);
+        ds().collateralSwapped = uint112(_received);
         if (_received < params.minimumMarginReceived) revert Slippage();
     }
 

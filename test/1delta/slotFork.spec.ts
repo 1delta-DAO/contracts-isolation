@@ -53,7 +53,7 @@ it("Mint USDC", async function () {
 
     console.log("Get Slot")
 
-    const slot = await new VixInitializeAggregator__factory(signer).attach('0x22F8cb8BD27cE5d6A36C68B4500Af514a32a050e')
+    const slot = await new VixInitializeAggregator__factory(signer).attach('0x20e3e8ec946124DeD47dbA0622EE5Ef930969fc6')
 
     const data = await slot.getDetails()
     console.log("data", data.collateralSwapped.toString(), data.debtSwapped.toString())
