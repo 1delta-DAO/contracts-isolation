@@ -46,7 +46,7 @@ it("Test create slot", async function () {
 
     const lens = await new VixLens__factory(signer).attach(deltaIsolationAddresses.lens)
 
-    const slots = await lens.getUserSlots(signer.address, deltaIsolationAddresses.factoryProxy)
+    const slots = await lens.callStatic.getUserSlots(signer.address, deltaIsolationAddresses.factoryProxy)
 
     console.log(slots)
 
