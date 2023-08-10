@@ -33,6 +33,36 @@ As of right now, DoveSwap and Quickswap can be aggregated for optimal swaps.
 
 Flexible path parameters allow all sotrs of transactions connected with Flash Swaps.
 
+## Encoding paths
+
+Encoding paths is required to create and close slots.
+
+```ts
+encodeAggregtorPathEthers(
+            ['0x...a', '0x...b', '0x...c', '0x...d'], // This is the token path as address array 
+            new Array(_tokensInRoute.length - 1).fill(FeeAmount.MEDIUM), // array of Uni V3 style pool Fees (if a Uniswap V3 fork like Dove is used)
+            [0, 3, 3], // specifies the margin interaction
+            [1, 1, 1], // specifies DEX -> 0 for Algebra / Quickswap and 1 for Doveswap
+            0 // flag for closing entire position (ignored when opening a position)
+        )
+```
+
+The margin interactions are the following:
+- 0: Open a position
+- 1: Close a position (ExactOutput)
+- 2: Exact output swap
+- 3: Exact input swap
+
+When composing a path longer than two tokens for opening a position, the margin interaction array has to start with the margin interaction followed by exactInput flags. In the example above, the path contains 4 tokens, meaning that on top of the margin open action 0, two exact input flags have to follow.
+
+When closing, one has to chain the close interaction 1 with the respective amount of exact output swaps. In the example above, if we would want to use the path to close the position instead, we would use the array `[1, 2 ,2]`.
+
+When calculating a path for depositing, either
+- a single address is used; or
+- only exact input swaps are executed. In the example abve, this would mean that the margin interaction array would be `[3, 3, 3]`
+
+**Supported DEXs:** Currently, the implementation supports 2 DEXs on zkEVm, Algebra or Quickswap and DoveSwap with many more to come.
+
 # Old Contracts
 
 ## Implementation for Compound V2 (and forks)
