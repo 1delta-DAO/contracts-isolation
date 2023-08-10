@@ -40,7 +40,7 @@ Encoding paths is required to create and close slots.
 ```ts
 encodeAggregtorPathEthers(
             ['0x...a', '0x...b', '0x...c', '0x...d'], // This is the token path as address array 
-            new Array(_tokensInRoute.length - 1).fill(FeeAmount.MEDIUM), // array of Uni V3 style pool Fees (if a Uniswap V3 fork like Dove is used)
+            [FeeAmount.MEDIUM, FeeAmount.LOW, FeeAmount.MEDIUM], // array of Uni V3 style pool Fees (if a Uniswap V3 fork like Dove is used)
             [0, 3, 3], // specifies the margin interaction
             [1, 1, 1], // specifies DEX -> 0 for Algebra / Quickswap and 1 for Doveswap
             0 // flag for closing entire position (ignored when opening a position), 1 is for closing for the desired output amount
