@@ -49,7 +49,7 @@ encodeAggregtorPathEthers(
 
 The margin interactions are the following:
 - 0: Open a position
-- 1: Close a position (ExactOutput)
+- 1: Close a position
 - 2: Exact output swap
 - 3: Exact input swap
 
