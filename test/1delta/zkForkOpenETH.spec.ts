@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { constants } from "ethers";
 import { deltaIsolationAddresses } from "../../scripts/zk-vix/addresses";
-import { VixSlotFactory__factory } from "../../types";
+import { VixLens__factory, VixSlotFactory__factory } from "../../types";
 import { encodeAddress, encodeAggregtorPathEthers } from "../uniswap-v3/periphery/shared/path";
 const { ethers } = require("hardhat");
 
@@ -43,5 +43,11 @@ it("Test create slot", async function () {
     }
 
     await factory.connect(signer).createSlot(params, { value: params.amountDeposited })
+
+    const lens = await new VixLens__factory(signer).attach(deltaIsolationAddresses.lens)
+
+    const slots = await lens.getUserSlots(signer.address, deltaIsolationAddresses.factoryProxy)
+
+    console.log(slots)
 
 })
