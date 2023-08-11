@@ -1,9 +1,20 @@
-import { constants } from "buffer";
 import { expect } from "chai";
 import { BigNumber } from "ethers";
 import { formatEther } from "ethers/lib/utils";
+import { deltaIsolationAddresses } from "../../scripts/zk-vix/addresses";
 // import { ethers, waffle } from "hardhat";
-import { AggregatorCallbackZK__factory, DataProvider__factory, DeltaModuleProvider__factory, DeltaSlot__factory, FeeOperator__factory, FlexSlotFactory__factory, ImplementationProvider__factory, SlotFactoryProxy__factory, TokenWrapped, TokenWrapped__factory, VixDirect__factory, VixInitializeAggregatorZK__factory, VixSlotFactory__factory } from "../../types";
+import {
+    AggregatorCallback__factory, DataProvider__factory,
+    DeltaModuleProvider__factory,
+    FeeOperator__factory,
+    SlotFactoryProxy__factory,
+    TokenWrapped,
+    VixDirect__factory,
+    VixInitializeAggregator__factory,
+    VixSlotFactory,
+    VixSlotFactory__factory
+} from "../../types";
+import { encodeAddress, encodeAggregtorPathEthers } from "../uniswap-v3/periphery/shared/path";
 import { findBalanceSlot, getSlot } from "./forkUtils";
 import { getSelectors, ModuleConfigAction } from "./helpers/diamond";
 // const { expect } = require("chai");
@@ -52,11 +63,18 @@ const ALG_POOL_CODE_HASH = '0x6ec6c9c8091d160c0aa74b2b14ba9c1717e95093bd3ac085ce
 const DOV_FF_FACTORY_ADDRESS = '0xdE474Db1Fa59898BC91314328D29507AcD0D593c';
 const DOV_POOL_INIT_CODE_HASH = '0xd3e7f58b9af034cfa7a0597e539bae7c6b393817a47a6fc1e1503cd6eaffe22a';
 
-it("Mint USDC", async function () {
-    const [signer] = await ethers.getSigners();
+const SLOT_FACTORY = deltaIsolationAddresses.factoryProxy
+
+// determinses whether to re-deploy or to use the existing deployment
+const DEPLOY_NEW = true
+
+it(`Test with ${DEPLOY_NEW ? 're-dployment' : 'existing deployment'}`, async function () {
+    let factory: VixSlotFactory
+    const [signer, partner] = await ethers.getSigners();
     let usdc: any = await ethers.getContractAt("TokenWrapped", usdcAddress);
     const signerAddress = await signer.getAddress();
     console.log("signer", signer.address)
+    const testPartner = partner.address
 
     // automatically find mapping slot
     const mappingSlot = await findBalanceSlot(usdc)
@@ -80,95 +98,162 @@ it("Mint USDC", async function () {
     expect(await usdc.balanceOf(signerAddress)).to.be.eq(value)
 
     const usdcContract = usdc as TokenWrapped
+    if (DEPLOY_NEW) {
+        const dataProvider = await new DataProvider__factory(signer).deploy()
 
-    const dataProvider = await new DataProvider__factory(signer).deploy()
+
+        for (let i = 0; i < underlyings.length; i++) {
+            const asset = underlyings[i]
+            await dataProvider.setOToken(asset, cS[i])
+        }
+
+        await dataProvider.setComptroller(VIX_COMPTROLLER)
+        await dataProvider.setOEther(O_NATIVE)
+
+        const factoryImplementation = await new VixSlotFactory__factory(signer).deploy()
+        const factoryProxy = await new SlotFactoryProxy__factory(signer).deploy()
+
+        await factoryProxy._setPendingImplementation(factoryImplementation.address)
+        await factoryImplementation._become(factoryProxy.address)
+
+        factory = await new VixSlotFactory__factory(signer).attach(factoryProxy.address)
 
 
-    for (let i = 0; i < underlyings.length; i++) {
-        const asset = underlyings[i]
-        await dataProvider.setOToken(asset, cS[i])
+        const moduleProvider = await new DeltaModuleProvider__factory(signer).deploy()
+
+        await factory.initialize(
+            moduleProvider.address,
+            dataProvider.address
+        )
+
+        const feeOperator = await new FeeOperator__factory(signer).attach(deltaIsolationAddresses.feeOperator)
+        console.log("fee fetch")
+        const dat = await feeOperator.getProtocolShare()
+        console.log("fee", dat.toString())
+        const callback = await new AggregatorCallback__factory(signer).deploy(
+            ALG_FF_FACTORY_ADDRESS,
+            DOV_FF_FACTORY_ADDRESS,
+            ALG_POOL_CODE_HASH,
+            DOV_POOL_INIT_CODE_HASH,
+            dataProvider.address,
+            WNATIVE_ADDRESS
+        )
+        const initializer = await new VixInitializeAggregator__factory(signer).deploy(
+            ALG_FF_FACTORY_ADDRESS,
+            DOV_FF_FACTORY_ADDRESS,
+            ALG_POOL_CODE_HASH,
+            DOV_POOL_INIT_CODE_HASH,
+            dataProvider.address,
+            WNATIVE_ADDRESS,
+            feeOperator.address
+        )
+        const direct = await new VixDirect__factory(signer).deploy(
+            dataProvider.address,
+            WNATIVE_ADDRESS,
+            factory.address
+
+        )
+
+        await moduleProvider.configureModules(
+            [
+                {
+                    moduleAddress: callback.address,
+                    action: ModuleConfigAction.Add,
+                    functionSelectors: getSelectors(callback)
+                },
+                {
+                    moduleAddress: initializer.address,
+                    action: ModuleConfigAction.Add,
+                    functionSelectors: getSelectors(initializer)
+                },
+                {
+                    moduleAddress: direct.address,
+                    action: ModuleConfigAction.Add,
+                    functionSelectors: getSelectors(direct)
+                },
+            ]
+        )
+    } else {
+        factory = await new VixSlotFactory__factory(signer).attach(SLOT_FACTORY)
     }
 
-    await dataProvider.setComptroller(VIX_COMPTROLLER)
-    await dataProvider.setOEther(O_NATIVE)
 
-    const factoryImplementation = await new VixSlotFactory__factory(signer).deploy()
-    const factoryProxy = await new SlotFactoryProxy__factory(signer).deploy()
+    const pathIn = encodeAddress(WNATIVE_ADDRESS)
 
-    await factoryProxy._setPendingImplementation(factoryImplementation.address)
-    await factoryImplementation._become(factoryProxy.address)
-
-    const factory = await new VixSlotFactory__factory(signer).attach(factoryProxy.address)
-
-
-    const moduleProvider = await new DeltaModuleProvider__factory(signer).deploy()
-
-    await factory.initialize(
-        moduleProvider.address,
-        dataProvider.address
+    const pathMargin = encodeAggregtorPathEthers(
+        [usdcAddress, WNATIVE_ADDRESS],
+        [3000],
+        [0],
+        [0],
+        0
     )
 
-    const feeOperator = await new FeeOperator__factory(signer).deploy(10)
+    const params = {
+        amountDeposited: "5034471781188815",
+        minimumAmountDeposited: "0",
+        borrowAmount: "1000000",
+        minimumMarginReceived: "0",
+        swapPath: pathIn,
+        marginPath: pathMargin,
+        partner: testPartner,
+        fee: 250
+    }
 
-
-    const callback = await new AggregatorCallbackZK__factory(signer).deploy(
-        dataProvider.address,
-        WNATIVE_ADDRESS
-    )
-    const initializer = await new VixInitializeAggregatorZK__factory(signer).deploy(
-        dataProvider.address,
-        WNATIVE_ADDRESS,
-        feeOperator.address
-    )
-    const direct = await new VixDirect__factory(signer).deploy(
-        dataProvider.address,
-        WNATIVE_ADDRESS,
-        factory.address
-
-    )
-
-    await moduleProvider.configureModules(
-        [
-            {
-                moduleAddress: callback.address,
-                action: ModuleConfigAction.Add,
-                functionSelectors: getSelectors(callback)
-            },
-            {
-                moduleAddress: initializer.address,
-                action: ModuleConfigAction.Add,
-                functionSelectors: getSelectors(initializer)
-            },
-            {
-                moduleAddress: direct.address,
-                action: ModuleConfigAction.Add,
-                functionSelectors: getSelectors(direct)
-            },
-        ]
-    )
+    console.log("Try create slot")
+    await factory.connect(signer).createSlot(params, { value: params.amountDeposited })
+    console.log("Created with ETH")
+    const tBal = await usdcContract.balanceOf(signer.address)
 
 
     const addr = await factory.getNextAddress(signer.address)
     console.log(addr)
     await usdcContract.connect(signer).approve(addr, ethers.constants.MaxUint256)
 
-    //    const
-    //     ['0xA8CE8aee21bC2A48a5EF670afCc9274C7bbbC035', '0x4F9A0e7FD2Bf6067db6994CF12E4495Df938E6e9'] [3000] [3] [1] 0
+    const pathInUSDC = encodeAggregtorPathEthers(
+        [usdcAddress, WNATIVE_ADDRESS],
+        [3000],
+        [3],
+        [0],
+        0
+    )
 
-    const tBal = await usdcContract.balanceOf('0xfa08b8866cbb9b25375d0f9c6562066ec361c8de')
+    const pathMarginUSDC = encodeAggregtorPathEthers(
+        [usdcAddress, WNATIVE_ADDRESS],
+        [3000],
+        [0],
+        [0],
+        0
+    )
 
     console.log("usdc ", tBal.toString())
-    const params = {
+    const paramsUSDC = {
         amountDeposited: "100000",
         minimumAmountDeposited: "0",
-        borrowAmount: "121866",
+        borrowAmount: "200000",
         minimumMarginReceived: "0",
-        swapPath: "0x4f9a0e7fd2bf6067db6994cf12e4495df938e6e9000bb80103a8ce8aee21bc2a48a5ef670afcc9274c7bbbc03500",
-        marginPath: "0x4f9a0e7fd2bf6067db6994cf12e4495df938e6e9000bb801001e4a5963abfd975d8c9021ce480b42188849d41d0000640103a8ce8aee21bc2a48a5ef670afcc9274c7bbbc03500",
-        partner: zeroAddr,
-        fee: 0
+        swapPath: pathInUSDC,
+        marginPath: pathMarginUSDC,
+        partner: testPartner,
+        fee: 200
     }
-    console.log("Try prepare slot")
-    await factory.connect(signer).createSlot(params)
+    console.log("Try create slot with USDC")
+    await factory.connect(signer).createSlot(paramsUSDC)
+    console.log("Created with USDC")
+
+
+    const testParamsETH = {
+        "amountDeposited": "1000000000000000",
+        "minimumAmountDeposited": "0",
+        "borrowAmount": "3506143",
+        "minimumMarginReceived": "0",
+        "swapPath": "0x4f9a0e7fd2bf6067db6994cf12e4495df938e6e9",
+        "marginPath": "0xa8ce8aee21bc2a48a5ef670afcc9274c7bbbc0350000000000c5015b9d9161dca7e18e32f6f25c4ad850731fd400000000034f9a0e7fd2bf6067db6994cf12e4495df938e6e900",
+        "partner": testPartner,
+        "fee": 50
+    }
+
+    console.log("Try create slot")
+    await factory.connect(signer).createSlot(testParamsETH, { value: testParamsETH.amountDeposited })
+    console.log("Created with ETH")
 
 })

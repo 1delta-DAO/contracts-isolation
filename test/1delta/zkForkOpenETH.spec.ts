@@ -1,16 +1,15 @@
-import { expect } from "chai";
-import { constants } from "ethers";
+import { waffle } from "hardhat";
 import { deltaIsolationAddresses } from "../../scripts/zk-vix/addresses";
 import { VixLens__factory, VixSlotFactory__factory } from "../../types";
 import { encodeAddress, encodeAggregtorPathEthers } from "../uniswap-v3/periphery/shared/path";
 const { ethers } = require("hardhat");
 
 it("Test create slot", async function () {
-    const [signer] = await ethers.getSigners();
+    const [signer, partner] = await ethers.getSigners();
     console.log('Get factory')
     const factory = await new VixSlotFactory__factory(signer).attach(deltaIsolationAddresses.factoryProxy)
     await factory.deployed()
-
+    const provider = waffle.provider
     const pathData = {
         "pathIn": "0x4f9a0e7fd2bf6067db6994cf12e4495df938e6e9",
         "pathMargin": [
@@ -38,8 +37,8 @@ it("Test create slot", async function () {
         minimumMarginReceived: "0",
         swapPath: pathIn,
         marginPath: pathMargin,
-        partner: constants.AddressZero,
-        fee: 0
+        partner: partner.address,
+        fee: 200
     }
 
     await factory.connect(signer).createSlot(params, { value: params.amountDeposited })
@@ -49,5 +48,9 @@ it("Test create slot", async function () {
     const slots = await lens.callStatic.getUserSlots(signer.address, deltaIsolationAddresses.factoryProxy)
 
     console.log(slots)
+
+    const partnerFeeCollected = await provider.getBalance(partner.address)
+
+    console.log("Fee collected", partnerFeeCollected.toString())
 
 })
