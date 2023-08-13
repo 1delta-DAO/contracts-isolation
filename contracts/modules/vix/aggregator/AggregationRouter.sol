@@ -5,10 +5,12 @@ import {BytesLib} from "../../../dex-tools/uniswap/libraries/BytesLib.sol";
 import {IUniswapV3Pool} from "../../../external-protocols/uniswapV3/core/interfaces/IUniswapV3Pool.sol";
 import {TokenTransfer} from "../../../utils/TokenTransfer.sol";
 import {INativeWrapper} from "../../../interfaces/INativeWrapper.sol";
+import {SelfPermit} from "./base/SelfPermit.sol";
+import {Multicall} from "./base/Multicall.sol";
 
 /// @title Uniswap V3 Swap Router
 /// @notice Router for stateless execution of swaps against Uniswap V3
-contract AggregationRouter is TokenTransfer {
+contract AggregationRouter is TokenTransfer, SelfPermit, Multicall {
     using BytesLib for bytes;
 
     /// @dev Used as the placeholder value for amountInCached, because the computed amount in for an exact output swap
@@ -51,22 +53,27 @@ contract AggregationRouter is TokenTransfer {
         DOV_POOL_INIT_CODE_HASH = doveHash;
     }
 
-    function multicall(bytes[] calldata data) public payable returns (bytes[] memory results) {
-        results = new bytes[](data.length);
-        for (uint256 i = 0; i < data.length; i++) {
-            (bool success, bytes memory result) = address(this).delegatecall(data[i]);
+    function getPoolDataAndSwapExactIn(
+        address recipient,
+        address payer,
+        uint256 amountIn,
+        bytes memory data
+    ) private returns (uint256) {
+        (address pool, bool zeroForOne) = _bytesToPool(data);
+        (int256 amount0, int256 amount1) = IUniswapV3Pool(pool).swap(
+            recipient,
+            zeroForOne,
+            int256(amountIn),
+            zeroForOne ? MIN_SQRT_RATIO : MAX_SQRT_RATIO,
+            abi.encode(
+                SwapCallbackData({
+                    path: data, // only the first pool in the path is necessary
+                    payer: payer
+                })
+            )
+        );
 
-            if (!success) {
-                // Next 5 lines from https://ethereum.stackexchange.com/a/83577
-                if (result.length < 68) revert();
-                assembly {
-                    result := add(result, 0x04)
-                }
-                revert(abi.decode(result, (string)));
-            }
-
-            results[i] = result;
-        }
+        return uint256(-(zeroForOne ? amount1 : amount0));
     }
 
     function exactInput(
@@ -78,36 +85,18 @@ contract AggregationRouter is TokenTransfer {
         address payer = msg.sender; // msg.sender pays for the first hop
 
         while (true) {
-            address tokenIn;
-            address tokenOut;
-            uint24 fee;
-            uint8 pId;
-            bool zeroForOne;
+            bool hasMultiplePools;
             assembly {
-                tokenIn := div(mload(add(add(path, 0x20), 0)), 0x1000000000000000000000000)
-                fee := mload(add(add(path, 0x3), 20))
-                pId := mload(add(add(path, 0x1), 23))
-                tokenOut := div(mload(add(add(path, 0x20), 24)), 0x1000000000000000000000000)
-                zeroForOne := lt(tokenIn, tokenOut)
+                hasMultiplePools := gt(mload(path), 44)
             }
-
-            (int256 amount0, int256 amount1) = _toPool(tokenIn, fee, pId, tokenOut).swap(
-                recipient,
-                zeroForOne,
-                int256(amountIn),
-                zeroForOne ? MIN_SQRT_RATIO : MAX_SQRT_RATIO,
-                abi.encode(
-                    SwapCallbackData({
-                        path: getFirstPool(path), // only the first pool in the path is necessary
-                        payer: payer
-                    })
-                )
+            amountIn = getPoolDataAndSwapExactIn(
+                hasMultiplePools ? address(this) : recipient, // hold funds until no more pools are legft
+                payer,
+                amountIn,
+                getFirstPool(path)
             );
-
-            amountIn = uint256(-(zeroForOne ? amount1 : amount0));
-
             // decide whether to continue or terminate
-            if (path.length > 44) {
+            if (hasMultiplePools) {
                 payer = address(this); // at this point, the caller has paid
                 path = skipToken(path);
             } else {
@@ -199,6 +188,59 @@ contract AggregationRouter is TokenTransfer {
         }
     }
 
+    // Compute the pool address given encoded bytes.
+    function _bytesToPool(bytes memory poolBytes) private view returns (address pool, bool zeroForOne) {
+        address tokenIn;
+        address tokenOut;
+        uint24 fee;
+        uint8 pId;
+        assembly {
+            tokenIn := div(mload(add(add(poolBytes, 0x20), 0)), 0x1000000000000000000000000)
+            fee := mload(add(add(poolBytes, 0x3), 20))
+            pId := mload(add(add(poolBytes, 0x1), 23))
+            tokenOut := div(mload(add(add(poolBytes, 0x20), 24)), 0x1000000000000000000000000)
+            zeroForOne := lt(tokenIn, tokenOut)
+        }
+        if (pId != 0) {
+            // Uniswap V3
+            bytes32 ffFactoryAddress = DOV_FF_FACTORY_ADDRESS;
+            bytes32 poolInitCodeHash = DOV_POOL_INIT_CODE_HASH;
+            (address token0, address token1) = zeroForOne ? (tokenIn, tokenOut) : (tokenOut, tokenIn);
+            assembly {
+                let s := mload(0x40)
+                let p := s
+                mstore(p, ffFactoryAddress)
+                p := add(p, 21)
+                // Compute the inner hash in-place
+                mstore(p, token0)
+                mstore(add(p, 32), token1)
+                mstore(add(p, 64), and(UINT24_MASK, fee))
+                mstore(p, keccak256(p, 96))
+                p := add(p, 32)
+                mstore(p, poolInitCodeHash)
+                pool := and(ADDRESS_MASK, keccak256(s, 85))
+            }
+        } else {
+            // Algebra Pool
+            bytes32 ffFactoryAddress = ALG_FF_FACTORY_ADDRESS;
+            bytes32 poolInitCodeHash = ALG_POOL_CODE_HASH;
+            (address token0, address token1) = zeroForOne ? (tokenIn, tokenOut) : (tokenOut, tokenIn);
+            assembly {
+                let s := mload(0x40)
+                let p := s
+                mstore(p, ffFactoryAddress)
+                p := add(p, 21)
+                // Compute the inner hash in-place
+                mstore(p, token0)
+                mstore(add(p, 32), token1)
+                mstore(p, keccak256(p, 64))
+                p := add(p, 32)
+                mstore(p, poolInitCodeHash)
+                pool := and(ADDRESS_MASK, keccak256(s, 85))
+            }
+        }
+    }
+
     struct SwapCallbackData {
         bytes path;
         address payer;
@@ -216,12 +258,12 @@ contract AggregationRouter is TokenTransfer {
         uint24 fee;
         uint8 pId;
         assembly {
-            tokenIn := div(mload(add(add(data, 0x20), 0)), 0x1000000000000000000000000)
-            fee := mload(add(add(data, 0x3), 20))
-            pId := mload(add(add(data, 0x1), 23))
-            tokenOut := div(mload(add(add(data, 0x20), 24)), 0x1000000000000000000000000)
+            let path := mload(data)
+            tokenIn := div(mload(add(add(path, 0x20), 0)), 0x1000000000000000000000000)
+            fee := mload(add(add(path, 0x3), 20))
+            pId := mload(add(add(path, 0x1), 23))
+            tokenOut := div(mload(add(add(path, 0x20), 24)), 0x1000000000000000000000000)
         }
-
         {
             require(msg.sender == address(_toPool(tokenIn, fee, pId, tokenOut)), "Inavlid Callback");
         }
@@ -264,7 +306,7 @@ contract AggregationRouter is TokenTransfer {
     }
 
     function getFirstPool(bytes memory path) private pure returns (bytes memory) {
-        return path.slice(0, 44); // 24 = 20 (address) + 3 (fee) + 1 (pId) + 20 (address)
+        return path.slice(0, 44); // 44 = 20 (address) + 3 (fee) + 1 (pId) + 20 (address)
     }
 
     /// @param token The token to pay

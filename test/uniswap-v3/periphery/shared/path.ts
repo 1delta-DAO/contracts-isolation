@@ -74,9 +74,9 @@ export function encodeAlgebraPathEthers(path: string[], fees: FeeAmount[], flags
 }
 
 // token address, poolFee, poolId, tradeType
-const typeSliceAggragator = ['address', 'uint24', 'uint8','uint8',]
+const typeSliceAggragator = ['address', 'uint24', 'uint8', 'uint8',]
 
-export function encodeAggregtorPathEthers(path: string[], fees: FeeAmount[], flags: number[],pIds:number[], flag: number): string {
+export function encodeAggregtorPathEthers(path: string[], fees: FeeAmount[], flags: number[], pIds: number[], flag: number): string {
   if (path.length != fees.length + 1) {
     throw new Error('path/fee lengths do not match')
   }
@@ -90,7 +90,7 @@ export function encodeAggregtorPathEthers(path: string[], fees: FeeAmount[], fla
   // add last address and flag
   types.push('address')
   types.push('uint8')
-  
+
   data.push(path[path.length - 1])
   data.push(String(flag))
 
@@ -127,6 +127,30 @@ export function encodeAlgebraPathEthersSimple(path: string[], flags: number[], f
 }
 
 
+// token address, poolFee, poolId, tradeType
+const typeSliceAggragatorRouter = ['address', 'uint24', 'uint8', ]
+
+export function encodeAggregtorPathEthersRouter(path: string[], fees: FeeAmount[], pIds: number[]): string {
+  if (path.length != fees.length + 1) {
+    throw new Error('path/fee lengths do not match')
+  }
+  let types: string[] = []
+  let data: string[] = []
+  for (let i = 0; i < fees.length; i++) {
+    const p = path[i]
+    types = [...types, ...typeSliceAggragatorRouter]
+    data = [...data, p, String(fees[i]), String(pIds[i])]
+  }
+  // add last address and flag
+  types.push('address')
+  data.push(path[path.length - 1])
+
+
+  // console.log(data)
+  // console.log(types)
+
+  return ethers.utils.solidityPack(types, data)
+}
 
 
 
