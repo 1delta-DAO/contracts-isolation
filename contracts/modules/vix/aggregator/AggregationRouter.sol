@@ -33,9 +33,9 @@ contract AggregationRouter is TokenTransfer {
     address private immutable WETH;
 
     /// @dev MIN_SQRT_RATIO + 1 from Uniswap's TickMath
-    uint160 internal immutable MIN_SQRT_RATIO = 4295128740;
+    uint160 private immutable MIN_SQRT_RATIO = 4295128740;
     /// @dev MAX_SQRT_RATIO - 1 from Uniswap's TickMath
-    uint160 internal immutable MAX_SQRT_RATIO = 1461446703485210103287273052203988822378723970341;
+    uint160 private immutable MAX_SQRT_RATIO = 1461446703485210103287273052203988822378723970341;
 
     constructor(
         address _weth,
@@ -51,12 +51,22 @@ contract AggregationRouter is TokenTransfer {
         DOV_POOL_INIT_CODE_HASH = doveHash;
     }
 
-    function skipToken(bytes memory path) internal pure returns (bytes memory) {
-        return path.slice(25, path.length - 25);
-    }
+    function multicall(bytes[] calldata data) public payable returns (bytes[] memory results) {
+        results = new bytes[](data.length);
+        for (uint256 i = 0; i < data.length; i++) {
+            (bool success, bytes memory result) = address(this).delegatecall(data[i]);
 
-    function getFirstPool(bytes memory path) internal pure returns (bytes memory) {
-        return path.slice(0, 44);
+            if (!success) {
+                // Next 5 lines from https://ethereum.stackexchange.com/a/83577
+                if (result.length < 68) revert();
+                assembly {
+                    result := add(result, 0x04)
+                }
+                revert(abi.decode(result, (string)));
+            }
+
+            results[i] = result;
+        }
     }
 
     function exactInput(
@@ -148,7 +158,7 @@ contract AggregationRouter is TokenTransfer {
         uint24 fee,
         uint8 pId,
         address outputToken
-    ) internal view returns (IUniswapV3Pool pool) {
+    ) private view returns (IUniswapV3Pool pool) {
         if (pId != 0) {
             // Uniswap V3
             bytes32 ffFactoryAddress = DOV_FF_FACTORY_ADDRESS;
@@ -249,6 +259,14 @@ contract AggregationRouter is TokenTransfer {
         }
     }
 
+    function skipToken(bytes memory path) private pure returns (bytes memory) {
+        return path.slice(24, path.length - 24); // 24 = 20 (address) + 3 (fee) + 1 (pId)
+    }
+
+    function getFirstPool(bytes memory path) private pure returns (bytes memory) {
+        return path.slice(0, 44); // 24 = 20 (address) + 3 (fee) + 1 (pId) + 20 (address)
+    }
+
     /// @param token The token to pay
     /// @param payer The entity that must pay
     /// @param recipient The entity that will receive payment
@@ -258,7 +276,7 @@ contract AggregationRouter is TokenTransfer {
         address payer,
         address recipient,
         uint256 value
-    ) internal {
+    ) private {
         if (token == WETH && address(this).balance >= value) {
             // pay with WETH
             INativeWrapper(WETH).deposit{value: value}(); // wrap only what is needed to pay
