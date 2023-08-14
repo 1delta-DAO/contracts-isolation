@@ -9,8 +9,7 @@ import {INativeWrapper} from "../../../interfaces/INativeWrapper.sol";
 import {SelfPermit} from "./base/SelfPermit.sol";
 import {Multicall} from "./base/Multicall.sol";
 
-/// @title Uniswap V3 Swap Router
-/// @notice Router for stateless execution of swaps against Uniswap V3
+/// @title Aggregation router for swapping through UniswapV3 and forks
 contract AggregationRouter is TokenTransfer, SelfPermit, Multicall {
     using BytesLib for bytes;
 
@@ -34,7 +33,7 @@ contract AggregationRouter is TokenTransfer, SelfPermit, Multicall {
     bytes32 private immutable DOV_FF_FACTORY_ADDRESS;
     bytes32 private immutable DOV_POOL_INIT_CODE_HASH;
 
-    address private immutable WETH;
+    address private immutable NativeWrapper;
 
     /// @dev MIN_SQRT_RATIO + 1 from Uniswap's TickMath
     uint160 private immutable MIN_SQRT_RATIO = 4295128740;
@@ -42,13 +41,13 @@ contract AggregationRouter is TokenTransfer, SelfPermit, Multicall {
     uint160 private immutable MAX_SQRT_RATIO = 1461446703485210103287273052203988822378723970341;
 
     constructor(
-        address _weth,
+        address _NativeWrapper,
         address _algebraDeployer,
         address _doveFactory,
         bytes32 algebraHash,
         bytes32 doveHash
     ) {
-        WETH = _weth;
+        NativeWrapper = _NativeWrapper;
         DOV_FF_FACTORY_ADDRESS = bytes32((uint256(0xff) << 248) | (uint256(uint160(_doveFactory)) << 88));
         ALG_POOL_CODE_HASH = algebraHash;
         ALG_FF_FACTORY_ADDRESS = bytes32((uint256(0xff) << 248) | (uint256(uint160(_algebraDeployer)) << 88));
@@ -84,6 +83,8 @@ contract AggregationRouter is TokenTransfer, SelfPermit, Multicall {
         address recipient,
         bytes memory path
     ) external payable returns (uint256 amountOut) {
+        // allow swapping to the router address with address 0
+        if (recipient == address(0)) recipient = address(this);
         address payer = msg.sender; // msg.sender pays for the first hop
 
         while (true) {
@@ -372,6 +373,16 @@ contract AggregationRouter is TokenTransfer, SelfPermit, Multicall {
         }
     }
 
+    function unwrapWNativeToken(uint256 amountMinimum, address payable recipient) external payable {
+        uint256 balanceWNativeToken = IERC20(NativeWrapper).balanceOf(address(this));
+        require(balanceWNativeToken >= amountMinimum, "Insufficient NativeWrapper");
+
+        if (balanceWNativeToken > 0) {
+            INativeWrapper(NativeWrapper).withdraw(balanceWNativeToken);
+            _transferEth(recipient, balanceWNativeToken);
+        }
+    }
+
     function refundNativeToken() external payable {
         if (address(this).balance > 0) _transferEth(payable(msg.sender), address(this).balance);
     }
@@ -382,10 +393,10 @@ contract AggregationRouter is TokenTransfer, SelfPermit, Multicall {
         address recipient,
         uint256 value
     ) private {
-        if (token == WETH && address(this).balance >= value) {
-            // pay with WETH
-            INativeWrapper(WETH).deposit{value: value}(); // wrap only what is needed to pay
-            INativeWrapper(WETH).transfer(recipient, value);
+        if (token == NativeWrapper && address(this).balance >= value) {
+            // pay with NativeWrapper
+            INativeWrapper(token).deposit{value: value}(); // wrap only what is needed to pay
+            _transferERC20Tokens(token, recipient, value);
         } else if (payer == address(this)) {
             // pay with tokens already in the contract (for the exact input multihop case)
             _transferERC20Tokens(token, recipient, value);
@@ -393,5 +404,9 @@ contract AggregationRouter is TokenTransfer, SelfPermit, Multicall {
             // pull payment
             _transferERC20TokensFrom(token, payer, recipient, value);
         }
+    }
+
+    receive() external payable {
+        require(msg.sender == NativeWrapper, "Not WNative");
     }
 }

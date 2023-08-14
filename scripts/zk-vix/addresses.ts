@@ -3,6 +3,7 @@
 export const WNATIVE_ADDRESS = '0x4F9A0e7FD2Bf6067db6994CF12E4495Df938E6e9'
 
 export const deltaIsolationAddresses = {
+    aggregationRouter: '0xC415733d05EB7EB4fba415c0624ae7a7A7a2c484',
     moduleProvider: '0x667518b0eFd52071bE34aa4f0cb6951b76dab1d6',
     dataProvider: '0x3a69cdd907b3AfD649bb4D636E31d21A3FFF797f',
     feeOperator: '0xBcf269cEB210c32FA43BCb82F469667e56f01175',
