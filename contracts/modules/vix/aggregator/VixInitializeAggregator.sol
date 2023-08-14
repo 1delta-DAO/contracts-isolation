@@ -12,19 +12,19 @@ import {INativeWrapper} from "../../../interfaces/INativeWrapper.sol";
 import {WithVixStorage, VixDetailsStorage, GeneralStorage} from "../VixStorage.sol";
 import {SafeCast} from "../../../dex-tools/uniswap/libraries/SafeCast.sol";
 import {FeeTransfer} from "../fees/FeeTransfer.sol";
+import {LendingInteractions} from "../../../utils/LendingInteractions.sol";
 import {InitParams, PermitParams, InitParamsWithPermit} from "../interfaces/ISlot.sol";
 
 /**
  * @title VixInitializeAggregator
  * @notice Initialization functions for slot - ideally called by a factory contract
  */
-contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer {
+contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer, LendingInteractions {
     using SafeCast for uint256;
 
     error Slippage();
     error AlreadyInitialized();
 
-    address private immutable NATIVE_WRAPPER;
     address private immutable DATA_PROVIDER;
     uint256 private constant DEFAULT_AMOUNT_CACHED = type(uint256).max;
 
@@ -35,10 +35,10 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer 
         bytes32 doveHash,
         address _dataProvider,
         address _weth,
+        address _cNative,
         address _feeCollector
-    ) BaseAggregator(_algebraDeployer, _doveFactory, algHash, doveHash) FeeTransfer(_feeCollector) {
+    ) BaseAggregator(_algebraDeployer, _doveFactory, algHash, doveHash) FeeTransfer(_feeCollector) LendingInteractions(_weth, _cNative) {
         DATA_PROVIDER = _dataProvider;
-        NATIVE_WRAPPER = _weth;
     }
 
     /**
@@ -70,21 +70,12 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer 
                 _tokenCollateral := div(mload(add(add(_bytes, 0x20), sub(bytesLength, 21))), 0x1000000000000000000000000)
             }
             if (_deposited < params.minimumAmountDeposited) revert Slippage();
+            collateralToken = IDataProvider(dataProvider).oToken(_tokenCollateral);
 
-            // in case we swapped to wrapped native
-            if (_tokenCollateral == NATIVE_WRAPPER) {
-                collateralToken = IDataProvider(dataProvider).oEther();
-                INativeWrapper(_tokenCollateral).withdraw(_deposited);
-                ICompoundTypeCEther(collateralToken).mint{value: _deposited}();
-            }
-            // in case we swap to any other erc20
-            else {
-                collateralToken = IDataProvider(dataProvider).oToken(_tokenCollateral);
-                // approve collateral token
-                IERC20(_tokenCollateral).approve(collateralToken, _deposited);
-                // deposit collateral
-                ICompoundTypeCERC20(collateralToken).mint(_deposited);
-            }
+            // in case we did not swap to wrapped native, we have to approve spending
+            if (_tokenCollateral != wNative) IERC20(_tokenCollateral).approve(collateralToken, _deposited);
+            // deposit collateral
+            _mint(collateralToken, _deposited);
         }
         // deposit cannot be Ether - handled by other function
         else {
@@ -93,7 +84,7 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer 
             IERC20(_tokenCollateral).approve(collateralToken, _deposited);
 
             // deposit collateral
-            ICompoundTypeCERC20(collateralToken).mint(_deposited);
+            _mint(collateralToken, _deposited);
         }
         gs().collateral = _tokenCollateral;
         // configure collateral
@@ -121,15 +112,15 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer 
         bytes memory _bytes = params.swapPath;
         address _tokenCollateral;
         ds().creationTime = uint32(block.timestamp % 2**32);
-
+        uint256 bytesLength;
         // fetch token
         assembly {
             _tokenCollateral := div(mload(add(add(_bytes, 0x20), 0)), 0x1000000000000000000000000)
+            bytesLength := mload(_bytes)
         }
 
         uint256 _deposited = applyFeeAndTransferEther(msg.value, params.partner, params.fee);
         address collateralToken;
-        uint256 bytesLength = _bytes.length;
         // if a route is provided, wrap ether and swap
         // the deposit is then ERC20 and not ether
         if (bytesLength > 22) {
@@ -141,7 +132,7 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer 
             if (_deposited < params.minimumAmountDeposited) revert Slippage();
             collateralToken = IDataProvider(dataProvider).oToken(_tokenCollateral);
             // approve deposit token (can also be the collateral token)
-            IERC20(_tokenCollateral).approve(collateralToken, type(uint256).max);
+            IERC20(_tokenCollateral).approve(collateralToken, _deposited);
             // deposit collateral
             ICompoundTypeCERC20(collateralToken).mint(_deposited);
         }
@@ -207,35 +198,26 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer 
         // swap if full calldata is provided
         if (_bytes.length > 22) {
             _deposited = exactInputToSelf(_deposited, _bytes);
-            uint256 index = _bytes.length;
             assembly {
-                _tokenCollateral := div(mload(add(add(_bytes, 0x20), sub(index, 21))), 0x1000000000000000000000000)
+                _tokenCollateral := div(mload(add(add(_bytes, 0x20), sub(mload(_bytes), 21))), 0x1000000000000000000000000)
             }
             if (_deposited < params.minimumAmountDeposited) revert Slippage();
 
-            // in case we swapped to wrapped native
-            if (_tokenCollateral == NATIVE_WRAPPER) {
-                collateralToken = IDataProvider(dataProvider).oEther();
-                INativeWrapper(_tokenCollateral).withdraw(_deposited);
-                ICompoundTypeCEther(collateralToken).mint{value: _deposited}();
-            }
-            // in case we swap to any other erc20
-            else {
-                collateralToken = IDataProvider(dataProvider).oToken(_tokenCollateral);
-                // approve collateral token
-                IERC20(_tokenCollateral).approve(collateralToken, _deposited);
-                // deposit collateral
-                ICompoundTypeCERC20(collateralToken).mint(_deposited);
-            }
-        }
-        // in direct case deposit cannot be ETH
-        else {
-            // get erc20 cToken
             collateralToken = IDataProvider(dataProvider).oToken(_tokenCollateral);
-            // capprove deposit token
-            IERC20(_tokenCollateral).approve(collateralToken, _deposited);
+            // in case we swap to anything else but wrapped native, we have to approve spending
+            if (_tokenCollateral != wNative) IERC20(_tokenCollateral).approve(collateralToken, _deposited);
+
             // deposit collateral
-            ICompoundTypeCERC20(collateralToken).mint(_deposited);
+            _mint(collateralToken, _deposited);
+        }
+        // deposit cannot be Ether - handled by other function
+        else {
+            collateralToken = IDataProvider(dataProvider).oToken(_tokenCollateral);
+            // approve deposit token (can also be the collateral token)
+            IERC20(_tokenCollateral).approve(collateralToken, _deposited);
+
+            // deposit collateral
+            _mint(collateralToken, _deposited);
         }
 
         // assign collateral
@@ -270,7 +252,7 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer 
         // efficient OnlyOwner() check
         address owner = ads().owner;
         require(msg.sender == owner, "OnlyOwner()");
-        address native = NATIVE_WRAPPER;
+        address native = wNative;
         // if repay amount is set to 0, the full borrow balance will be repaid
         bool partFlag = amountToRepay != 0;
         // avoid stack too deep
@@ -346,7 +328,7 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer 
     }
 
     function getOTokens() external view returns (address collateralToken, address collateralTokenBorrow) {
-        address wrapper = NATIVE_WRAPPER;
+        address wrapper = wNative;
         address dataProvider = DATA_PROVIDER;
 
         address debt = gs().debt;

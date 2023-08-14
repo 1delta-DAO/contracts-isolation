@@ -9,6 +9,7 @@ import {INativeWrapper} from "../../../interfaces/INativeWrapper.sol";
 import {IERC20} from "../../../external-protocols/openzeppelin/token/ERC20/IERC20.sol";
 import {ICompoundTypeCEther, ICompoundTypeCERC20, IDataProvider} from "../data-provider/IDataProvider.sol";
 import {TokenTransfer} from "../../../utils/TokenTransfer.sol";
+import {LendingInteractions} from "../../../utils/LendingInteractions.sol";
 import {WithVixStorage} from "../VixStorage.sol";
 import {BaseAggregator} from "./BaseAggregator.sol";
 
@@ -17,7 +18,7 @@ import {BaseAggregator} from "./BaseAggregator.sol";
  * @notice UniswapV3 style callback function that handles building margin positions
  * @author Achthar
  */
-contract AggregatorCallback is BaseAggregator, TokenTransfer, WithVixStorage {
+contract AggregatorCallback is BaseAggregator, TokenTransfer, WithVixStorage, LendingInteractions {
     error Callback();
 
     using BytesLib for bytes;
@@ -27,18 +28,16 @@ contract AggregatorCallback is BaseAggregator, TokenTransfer, WithVixStorage {
 
     address public immutable DATA_PROVIDER;
 
-    address internal immutable NATIVE_WRAPPER;
-
     constructor(
         address _algebraDeployer,
         address _doveFactory,
         bytes32 algHash,
         bytes32 doveHash,
         address _dataProvider,
-        address _weth
-    ) BaseAggregator(_algebraDeployer, _doveFactory, algHash, doveHash) {
+        address _weth,
+        address _cNative
+    ) BaseAggregator(_algebraDeployer, _doveFactory, algHash, doveHash) LendingInteractions(_weth, _cNative) {
         DATA_PROVIDER = _dataProvider;
-        NATIVE_WRAPPER = _weth;
     }
 
     function algebraSwapCallback(
@@ -100,47 +99,18 @@ contract AggregatorCallback is BaseAggregator, TokenTransfer, WithVixStorage {
             gs().debt = tokenIn;
             tokenOut = gs().collateral; // lock out to collateral
 
-            address cacheToken = NATIVE_WRAPPER;
-            address cacheAddress = DATA_PROVIDER;
-            // debt is ETH
-            if (cacheToken == tokenIn) {
-                address cTokenOut;
-                (cTokenOut, cacheToken) = IDataProvider(cacheAddress).oTokenAndOEther(tokenOut);
-                IERC20(tokenOut).approve(cTokenOut, amountToSupply);
-                // deposit regular ERC20
-                ICompoundTypeCERC20(cTokenOut).mint(amountToSupply);
-                // borrow ETH
-                ICompoundTypeCEther(cacheToken).borrow(amountToBorrow);
-                // deposit ETH for wETH
-                INativeWrapper(tokenIn).deposit{value: amountToBorrow}();
-                // transfer WETH
-                _transferERC20Tokens(tokenIn, msg.sender, amountToBorrow);
-            } else {
-                // collateral in ETH
-                if (cacheToken == tokenOut) {
-                    // get oToken and oEther
-                    (cacheToken, cacheAddress) = IDataProvider(cacheAddress).oTokenAndOEther(tokenIn);
-                    // withdraw WETH
-                    INativeWrapper(tokenOut).withdraw(amountToSupply); // unwrap
-                    // deposit ETH
-                    ICompoundTypeCEther(cacheAddress).mint{value: amountToSupply}();
-                    // borrow regular ERC20
-                    ICompoundTypeCERC20(cacheToken).borrow(amountToBorrow);
-                    // transfer ERC20
-                    _transferERC20Tokens(tokenIn, msg.sender, amountToBorrow);
-                } else {
-                    address _oToken;
-                    // only ERC20
-                    (_oToken, cacheAddress) = IDataProvider(cacheAddress).oTokens(tokenOut, tokenIn);
-                    IERC20(tokenOut).approve(_oToken, amountToSupply);
-                    // deposit regular ERC20
-                    ICompoundTypeCERC20(_oToken).mint(amountToSupply);
-                    // borrow regular ERC20
-                    ICompoundTypeCERC20(cacheAddress).borrow(amountToBorrow);
-                    // transfer ERC20
-                    _transferERC20Tokens(tokenIn, msg.sender, amountToBorrow);
-                }
-            }
+            address cTokenOut;
+
+            address cTokenIn;
+            (cTokenOut, cTokenIn) = IDataProvider(DATA_PROVIDER).oTokens(tokenOut, tokenIn);
+            if (tokenOut != wNative) IERC20(tokenOut).approve(cTokenOut, amountToSupply);
+            // deposit regular ERC20
+            _mint(cTokenOut, amountToSupply);
+            // borrow ETH
+            _borrow(cTokenIn, amountToBorrow);
+
+            // transfer WETH
+            _transferERC20Tokens(tokenIn, msg.sender, amountToBorrow);
         }
         // CLOSE - EXACT OUT SWAP
         else if (tradeType == 1) {
@@ -148,7 +118,7 @@ contract AggregatorCallback is BaseAggregator, TokenTransfer, WithVixStorage {
                 ? (uint256(amount0Delta), uint256(-amount1Delta))
                 : (uint256(amount1Delta), uint256(-amount0Delta));
             // repay currency is ETH
-            if (tokenIn == NATIVE_WRAPPER) {
+            if (tokenIn == wNative) {
                 // withdraw WETH
                 INativeWrapper(tokenIn).withdraw(amountToRepay); // unwrap
                 // repay ETH
@@ -191,7 +161,7 @@ contract AggregatorCallback is BaseAggregator, TokenTransfer, WithVixStorage {
                 assembly {
                     tradeType := mload(add(add(data, 0x1), 45)) // will only be used in last hop
                 }
-                if (tokenOut == NATIVE_WRAPPER) {
+                if (tokenOut == wNative) {
                     ICompoundTypeCEther cEtherContract = ICompoundTypeCEther(IDataProvider(DATA_PROVIDER).oEther());
                     if (tradeType != 0) {
                         cEtherContract.redeemUnderlying(amountToWithdraw);
@@ -246,7 +216,7 @@ contract AggregatorCallback is BaseAggregator, TokenTransfer, WithVixStorage {
                     tradeType := mload(add(add(data, 0x1), 45)) // will only be used in last hop
                 }
                 // withraw and send funds to the pool
-                if (tokenOut == NATIVE_WRAPPER) {
+                if (tokenOut == wNative) {
                     // withdraw ETH from cETH
                     if (tradeType != 0) {
                         ICompoundTypeCEther(IDataProvider(DATA_PROVIDER).oEther()).redeemUnderlying(amountToPay);

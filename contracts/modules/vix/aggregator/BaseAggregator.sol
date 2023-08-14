@@ -105,14 +105,15 @@ abstract contract BaseAggregator {
             address tokenOut;
             uint24 fee;
             uint8 pId;
+            bool zeroForOne;
             assembly {
                 tokenIn := div(mload(add(add(exactInputData, 0x20), 0)), 0x1000000000000000000000000)
                 fee := mload(add(add(exactInputData, 0x3), 20))
                 pId := mload(add(add(exactInputData, 0x1), 23))
                 tokenOut := div(mload(add(add(exactInputData, 0x20), 25)), 0x1000000000000000000000000)
+                zeroForOne := lt(tokenIn, tokenOut)
             }
 
-            bool zeroForOne = tokenIn < tokenOut;
             (int256 amount0, int256 amount1) = _toPool(tokenIn, fee, pId, tokenOut).swap(
                 address(this),
                 zeroForOne,

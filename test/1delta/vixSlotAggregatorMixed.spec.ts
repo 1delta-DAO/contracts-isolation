@@ -128,6 +128,7 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
 
         await dataProvider.setComptroller(compoundFixture.comptroller.address)
         await dataProvider.setOEther(compoundFixture.cEther.address)
+        await dataProvider.setOToken(tokenData.wnative.address, compoundFixture.cEther.address)
 
 
         const factoryProxy = await new SlotFactoryProxy__factory(deployer).deploy()
@@ -146,7 +147,8 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
             ALG_POOL_CODE_HASH,
             DOV_POOL_INIT_CODE_HASH,
             dataProvider.address,
-            tokenData.wnative.address
+            tokenData.wnative.address,
+            compoundFixture.cEther.address
         )
         initializer = await new VixInitializeAggregator__factory(deployer).deploy(
             algebra.poolDeployer.address,
@@ -155,6 +157,7 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
             DOV_POOL_INIT_CODE_HASH,
             dataProvider.address,
             tokenData.wnative.address,
+            compoundFixture.cEther.address,
             feeOperator.address
         )
         direct = await new VixDirect__factory(deployer).deploy(
