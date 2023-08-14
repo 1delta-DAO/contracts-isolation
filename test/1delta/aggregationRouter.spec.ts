@@ -1,38 +1,17 @@
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
-import { ethers, network, waffle } from 'hardhat'
-import { expect } from './shared/expect'
+import { ethers, waffle } from 'hardhat'
 import {
     ERC20Mock__factory,
-    FiatWithPermit,
-    DeltaModuleProvider,
-    DeltaModuleProvider__factory,
-    VixSlotFactory,
-    SlotFactoryProxy__factory,
-    VixSlotFactory__factory,
-    DataProvider,
-    DataProvider__factory,
-    VixDirect,
-    VixDirect__factory,
-    VixInitializeAggregator,
-    AggregatorCallback,
-    AggregatorCallback__factory,
-    VixInitializeAggregator__factory,
-    FeeOperator,
-    FeeOperator__factory,
-    VixLens__factory,
-    VixLens,
     AggregationRouter,
     AggregationRouter__factory
 } from '../../types';
 import { BigNumber, constants } from 'ethers';
 import { expandTo18Decimals } from '../uniswap-v3/core/shared/utilities';
-import { encodeAddress, encodeAggregtorPathEthers, encodeAggregtorPathEthersRouter } from '../uniswap-v3/periphery/shared/path';
+import { encodeAggregtorPathEthersRouter } from '../uniswap-v3/periphery/shared/path';
 import { formatEther } from 'ethers/lib/utils';
 import { addAlgebraLiquidity, algebraFixture, AlgebraFixture } from './shared/algebraFixture';
 import { tokenFixture, TokenFixture } from './shared/tokensFixture';
 import { MockProvider } from 'ethereum-waffle';
-import { produceSig } from './shared/permitUtils';
-import { getSelectors, ModuleConfigAction } from './helpers/diamond';
 import { addUniswapLiquidity, uniswapMinimalFixtureNoTokens, UniswapMinimalFixtureNoTokens } from './shared/uniswapFixture';
 import { FeeAmount } from '../uniswap-v3/periphery/shared/constants';
 
@@ -50,7 +29,7 @@ const DOV_POOL_INIT_CODE_HASH = '0xe34f199b19b2b4f47f68442619d555527d244f78a3297
 
 
 // Tests all configurations for the minimal slot variant
-describe('Diamond Slot aggregation trading via data provider', async () => {
+describe('Aggragtion Router', async () => {
     let deployer: SignerWithAddress, alice: SignerWithAddress, bob: SignerWithAddress, carol: SignerWithAddress;
     let partner: SignerWithAddress
     let uniswap: UniswapMinimalFixtureNoTokens
@@ -211,7 +190,59 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
 
 
 
-    it.only('SINGLE: allows to single swap', async () => {
+    it.only('SINGLE: allows to swap exact in', async () => {
+
+        const inIndex = 3
+        const routeIndexes = [3, 2]
+        const swapAmount = expandTo18Decimals(50)
+
+        let _tokensInRoute = routeIndexes.map(t => tokenData.tokens[t].address)
+        console.log("route", _tokensInRoute, alice.address)
+        const path = encodeAggregtorPathEthersRouter(
+            _tokensInRoute,
+            new Array(_tokensInRoute.length - 1).fill(FeeAmount.MEDIUM),
+            [1],
+        )
+
+        await approve(alice, _tokensInRoute[0], aggregationRouter.address)
+
+
+        await aggregationRouter.connect(alice).exactInput(
+            swapAmount,
+            swapAmount.mul(95).div(100),
+            alice.address,
+            path,
+        )
+
+    })
+
+    it.only('SINGLE: allows to swap exact out', async () => {
+
+        const inIndex = 3
+        const routeIndexes = [2, 3]
+        const swapAmount = expandTo18Decimals(50)
+
+        let _tokensInRoute = routeIndexes.map(t => tokenData.tokens[t].address).reverse()
+        console.log("route", _tokensInRoute, alice.address)
+        const path = encodeAggregtorPathEthersRouter(
+            _tokensInRoute,
+            new Array(_tokensInRoute.length - 1).fill(FeeAmount.MEDIUM),
+            [0],
+        )
+
+        await approve(alice, _tokensInRoute[_tokensInRoute.length - 1], aggregationRouter.address)
+
+
+        await aggregationRouter.connect(alice).exactOutput(
+            swapAmount,
+            swapAmount.mul(105).div(100),
+            alice.address,
+            path,
+        )
+
+    })
+
+    it.only('MULTI: allows to swap exact in', async () => {
 
         const inIndex = 3
         const routeIndexes = [3, 2, 1, 0]
@@ -222,7 +253,7 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
         const path = encodeAggregtorPathEthersRouter(
             _tokensInRoute,
             new Array(_tokensInRoute.length - 1).fill(FeeAmount.MEDIUM),
-            [1, 1, 1],
+            [1, 0, 1],
         )
 
         await approve(alice, _tokensInRoute[0], aggregationRouter.address)
@@ -231,6 +262,32 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
         await aggregationRouter.connect(alice).exactInput(
             swapAmount,
             swapAmount.mul(95).div(100),
+            alice.address,
+            path,
+        )
+
+    })
+
+    it.only('MULTI: allows to swap exact out', async () => {
+
+        const inIndex = 3
+        const routeIndexes = [3, 2, 1, 0]
+        const swapAmount = expandTo18Decimals(50)
+
+        let _tokensInRoute = routeIndexes.map(t => tokenData.tokens[t].address).reverse()
+        console.log("route", _tokensInRoute, alice.address)
+        const path = encodeAggregtorPathEthersRouter(
+            _tokensInRoute,
+            new Array(_tokensInRoute.length - 1).fill(FeeAmount.MEDIUM),
+            [1, 1, 0],
+        )
+
+        await approve(alice, _tokensInRoute[_tokensInRoute.length - 1], aggregationRouter.address)
+
+
+        await aggregationRouter.connect(alice).exactOutput(
+            swapAmount,
+            swapAmount.mul(105).div(100),
             alice.address,
             path,
         )
@@ -246,18 +303,9 @@ describe('Diamond Slot aggregation trading via data provider', async () => {
 // ······················································································································|···························|···········|······························
 // |  Methods                                                                                                            ·              34 gwei/gas              ·       1862.68 usd/eth       │
 // ···········································································|··········································|·············|·············|···········|···············|··············
-// |  Contract                                                                ·  Method                                  ·  Min        ·  Max        ·  Avg      ·  # calls      ·  usd (avg)  │
-// ···········································································|··········································|·············|·············|···········|···············|··············
-// |  AdminUpgradeabilityProxy                                                ·  changeAdmin                             ·          -  ·          -  ·    31903  ·            1  ·       2.02  │
-// ···········································································|··········································|·············|·············|···········|···············|··············
-// |  AggregationSlotFactory                                                  ·  createSlot                              ·     846487  ·    1188456  ·  1010289  ·           13  ·      63.98  │
-// ···········································································|··········································|·············|·············|···········|···············|··············
-// |  AggregationSlotFactory                                                  ·  createSlotWithPermit                    ·    1098133  ·    1160384  ·  1129259  ·            2  ·      71.52  │
-// ···········································································|··········································|·············|·············|···········|···············|··············
-
-// w fee
-// ···········································································|··········································|·············|·············|···········|···············|··············
-// |  VixSlotFactory                                                          ·  createSlot                              ·     853874  ·    1212011  ·  1008384  ·           14  ·      34.02  │
-// ···········································································|··········································|·············|·············|···········|···············|··············
-// |  VixSlotFactory                                                          ·  createSlotWithPermit                    ·    1046202  ·    1248658  ·  1151389  ·            4  ·      38.85  │
-// ···········································································|··········································|·············|·············|···········|···············|··············
+// |  Contract                                                    ·  Method                                              ·  Min        ·  Max        ·  Avg      ·  # calls      ·  usd (avg)  │
+// ·······························································|······················································|·············|·············|···········|···············|··············
+// |  AggregationRouter                                           ·  exactInput                                          ·          -  ·          -  ·   318996  ·            1  ·       7.66  │
+// ·······························································|······················································|·············|·············|···········|···············|··············
+// |  AggregationRouter                                           ·  exactOutput                                         ·          -  ·          -  ·   308175  ·            1  ·       7.40  │
+// ·······························································|······················································|·············|·············|···········|···············|··············

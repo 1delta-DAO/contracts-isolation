@@ -1,4 +1,5 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
+// SPDX-License-Identifier: BUSL 1.1
+
 pragma solidity ^0.8.21;
 
 import {BytesLib} from "../../../dex-tools/uniswap/libraries/BytesLib.sol";
@@ -29,6 +30,7 @@ contract AggregationRouter is TokenTransfer, SelfPermit, Multicall {
     bytes32 private immutable ALG_FF_FACTORY_ADDRESS;
     bytes32 private immutable ALG_POOL_CODE_HASH;
 
+    // DoveSwap factory ref
     bytes32 private immutable DOV_FF_FACTORY_ADDRESS;
     bytes32 private immutable DOV_POOL_INIT_CODE_HASH;
 
@@ -149,18 +151,24 @@ contract AggregationRouter is TokenTransfer, SelfPermit, Multicall {
         address outputToken
     ) private view returns (IUniswapV3Pool pool) {
         if (pId != 0) {
-            // Uniswap V3
+            // Uniswap V3: Dove
             bytes32 ffFactoryAddress = DOV_FF_FACTORY_ADDRESS;
             bytes32 poolInitCodeHash = DOV_POOL_INIT_CODE_HASH;
-            (address token0, address token1) = inputToken < outputToken ? (inputToken, outputToken) : (outputToken, inputToken);
             assembly {
                 let s := mload(0x40)
                 let p := s
                 mstore(p, ffFactoryAddress)
                 p := add(p, 21)
                 // Compute the inner hash in-place
-                mstore(p, token0)
-                mstore(add(p, 32), token1)
+                switch lt(inputToken, outputToken)
+                case 0 {
+                    mstore(p, outputToken)
+                    mstore(add(p, 32), inputToken)
+                }
+                default {
+                    mstore(p, inputToken)
+                    mstore(add(p, 32), outputToken)
+                }
                 mstore(add(p, 64), and(UINT24_MASK, fee))
                 mstore(p, keccak256(p, 96))
                 p := add(p, 32)
@@ -171,15 +179,21 @@ contract AggregationRouter is TokenTransfer, SelfPermit, Multicall {
             // Algebra Pool
             bytes32 ffFactoryAddress = ALG_FF_FACTORY_ADDRESS;
             bytes32 poolInitCodeHash = ALG_POOL_CODE_HASH;
-            (address token0, address token1) = inputToken < outputToken ? (inputToken, outputToken) : (outputToken, inputToken);
             assembly {
                 let s := mload(0x40)
                 let p := s
                 mstore(p, ffFactoryAddress)
                 p := add(p, 21)
                 // Compute the inner hash in-place
-                mstore(p, token0)
-                mstore(add(p, 32), token1)
+                switch lt(inputToken, outputToken)
+                case 0 {
+                    mstore(p, outputToken)
+                    mstore(add(p, 32), inputToken)
+                }
+                default {
+                    mstore(p, inputToken)
+                    mstore(add(p, 32), outputToken)
+                }
                 mstore(p, keccak256(p, 64))
                 p := add(p, 32)
                 mstore(p, poolInitCodeHash)
@@ -202,18 +216,24 @@ contract AggregationRouter is TokenTransfer, SelfPermit, Multicall {
             zeroForOne := lt(tokenIn, tokenOut)
         }
         if (pId != 0) {
-            // Uniswap V3
+            // Uniswap V3: Dove
             bytes32 ffFactoryAddress = DOV_FF_FACTORY_ADDRESS;
             bytes32 poolInitCodeHash = DOV_POOL_INIT_CODE_HASH;
-            (address token0, address token1) = zeroForOne ? (tokenIn, tokenOut) : (tokenOut, tokenIn);
             assembly {
                 let s := mload(0x40)
                 let p := s
                 mstore(p, ffFactoryAddress)
                 p := add(p, 21)
                 // Compute the inner hash in-place
-                mstore(p, token0)
-                mstore(add(p, 32), token1)
+                switch zeroForOne
+                case 0 {
+                    mstore(p, tokenOut)
+                    mstore(add(p, 32), tokenIn)
+                }
+                default {
+                    mstore(p, tokenIn)
+                    mstore(add(p, 32), tokenOut)
+                }
                 mstore(add(p, 64), and(UINT24_MASK, fee))
                 mstore(p, keccak256(p, 96))
                 p := add(p, 32)
@@ -224,15 +244,21 @@ contract AggregationRouter is TokenTransfer, SelfPermit, Multicall {
             // Algebra Pool
             bytes32 ffFactoryAddress = ALG_FF_FACTORY_ADDRESS;
             bytes32 poolInitCodeHash = ALG_POOL_CODE_HASH;
-            (address token0, address token1) = zeroForOne ? (tokenIn, tokenOut) : (tokenOut, tokenIn);
             assembly {
                 let s := mload(0x40)
                 let p := s
                 mstore(p, ffFactoryAddress)
                 p := add(p, 21)
                 // Compute the inner hash in-place
-                mstore(p, token0)
-                mstore(add(p, 32), token1)
+                switch zeroForOne
+                case 0 {
+                    mstore(p, tokenOut)
+                    mstore(add(p, 32), tokenIn)
+                }
+                default {
+                    mstore(p, tokenIn)
+                    mstore(add(p, 32), tokenOut)
+                }
                 mstore(p, keccak256(p, 64))
                 p := add(p, 32)
                 mstore(p, poolInitCodeHash)
@@ -251,6 +277,22 @@ contract AggregationRouter is TokenTransfer, SelfPermit, Multicall {
         int256 amount1Delta,
         bytes calldata _data
     ) external {
+        _v3StyleCallback(amount0Delta, amount1Delta, _data);
+    }
+
+    function algebraSwapCallback(
+        int256 amount0Delta,
+        int256 amount1Delta,
+        bytes calldata _data
+    ) external {
+        _v3StyleCallback(amount0Delta, amount1Delta, _data);
+    }
+
+    function _v3StyleCallback(
+        int256 amount0Delta,
+        int256 amount1Delta,
+        bytes calldata _data
+    ) private {
         require(amount0Delta > 0 || amount1Delta > 0); // swaps entirely within 0-liquidity regions are not supported
         SwapCallbackData memory data = abi.decode(_data, (SwapCallbackData));
         address tokenIn;
@@ -279,10 +321,11 @@ contract AggregationRouter is TokenTransfer, SelfPermit, Multicall {
                 data.path = skipToken(data.path);
                 bool zeroForOne;
                 assembly {
-                    tokenOut := div(mload(add(add(data, 0x20), 0)), 0x1000000000000000000000000)
-                    fee := mload(add(add(data, 0x3), 20))
-                    pId := mload(add(add(data, 0x1), 23))
-                    tokenIn := div(mload(add(add(data, 0x20), 24)), 0x1000000000000000000000000)
+                    let path := mload(data)
+                    tokenOut := div(mload(add(add(path, 0x20), 0)), 0x1000000000000000000000000)
+                    fee := mload(add(add(path, 0x3), 20))
+                    pId := mload(add(add(path, 0x1), 23))
+                    tokenIn := div(mload(add(add(path, 0x20), 24)), 0x1000000000000000000000000)
                     zeroForOne := lt(tokenIn, tokenOut)
                 }
 

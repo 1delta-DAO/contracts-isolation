@@ -7,6 +7,7 @@ import "./libraries/FullMath.sol";
 import "../../../external-protocols/algebra/core/interfaces/callback/IAlgebraSwapCallback.sol";
 import {BytesLib} from "../../../dex-tools/uniswap/libraries/BytesLib.sol";
 import {Path} from "../../../dex-tools/uniswap/libraries/QuotePath.sol";
+
 interface ISwapPool {
     function swap(
         address recipient,
@@ -45,7 +46,6 @@ contract AggregationQuoterLive {
         uint24 fee,
         address outputToken
     ) internal pure returns (ISwapPool pool) {
-        
         assembly {
             let pairOrder := lt(inputToken, outputToken)
             let s := mload(0x40)
@@ -167,7 +167,7 @@ contract AggregationQuoterLive {
         uint256 amountIn,
         uint160 sqrtPriceLimitX96
     ) public returns (uint256 amountOut) {
-        bool zeroForOne = tokenIn < tokenOut;    
+        bool zeroForOne = tokenIn < tokenOut;
         try
             _toPool(tokenIn, fee, tokenOut).swap(
                 address(this), // address(0) might cause issues with some tokens
