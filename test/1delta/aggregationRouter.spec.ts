@@ -37,6 +37,7 @@ describe('Aggragtion Router', async () => {
     let tokenData: TokenFixture
     let provider: MockProvider
     let aggregationRouter: AggregationRouter
+    let routerProxy:AggregationRouter
 
     before('get wallets and fixture', async () => {
         [deployer, alice, bob, carol, partner] = await ethers.getSigners();
@@ -78,7 +79,6 @@ describe('Aggragtion Router', async () => {
             uniswap.factory.address,
             ALG_POOL_CODE_HASH,
             DOV_POOL_INIT_CODE_HASH,
-
         )
 
 

@@ -4,7 +4,7 @@ pragma solidity ^0.8.21;
 
 import {BytesLib} from "../../../dex-tools/uniswap/libraries/BytesLib.sol";
 import {IUniswapV3Pool} from "../../../external-protocols/uniswapV3/core/interfaces/IUniswapV3Pool.sol";
-import {TokenTransfer} from "../../../utils/TokenTransfer.sol";
+import {TokenTransfer, IERC20} from "../../../utils/TokenTransfer.sol";
 import {INativeWrapper} from "../../../interfaces/INativeWrapper.sol";
 import {SelfPermit} from "./base/SelfPermit.sol";
 import {Multicall} from "./base/Multicall.sol";
@@ -272,6 +272,7 @@ contract AggregationRouter is TokenTransfer, SelfPermit, Multicall {
         address payer;
     }
 
+    /// @notice covers DoveSwap's implementation
     function uniswapV3SwapCallback(
         int256 amount0Delta,
         int256 amount1Delta,
@@ -280,6 +281,7 @@ contract AggregationRouter is TokenTransfer, SelfPermit, Multicall {
         _v3StyleCallback(amount0Delta, amount1Delta, _data);
     }
 
+    /// @notice covers Algebra's implementation
     function algebraSwapCallback(
         int256 amount0Delta,
         int256 amount1Delta,
@@ -288,6 +290,7 @@ contract AggregationRouter is TokenTransfer, SelfPermit, Multicall {
         _v3StyleCallback(amount0Delta, amount1Delta, _data);
     }
 
+    /// @notice the general UniswapV3 style callback
     function _v3StyleCallback(
         int256 amount0Delta,
         int256 amount1Delta,
@@ -344,6 +347,8 @@ contract AggregationRouter is TokenTransfer, SelfPermit, Multicall {
         }
     }
 
+    /** Getters ans slicers for pools */
+
     function skipToken(bytes memory path) private pure returns (bytes memory) {
         return path.slice(24, path.length - 24); // 24 = 20 (address) + 3 (fee) + 1 (pId)
     }
@@ -352,10 +357,25 @@ contract AggregationRouter is TokenTransfer, SelfPermit, Multicall {
         return path.slice(0, 44); // 44 = 20 (address) + 3 (fee) + 1 (pId) + 20 (address)
     }
 
-    /// @param token The token to pay
-    /// @param payer The entity that must pay
-    /// @param recipient The entity that will receive payment
-    /// @param value The amount to pay
+    /** Optimized transfer functions */
+
+    function sweepToken(
+        address token,
+        uint256 amountMinimum,
+        address recipient
+    ) external payable {
+        uint256 balanceToken = IERC20(token).balanceOf(address(this));
+        require(balanceToken >= amountMinimum, "Insufficient token");
+
+        if (balanceToken > 0) {
+            _transferERC20Tokens(token, recipient, balanceToken);
+        }
+    }
+
+    function refundNativeToken() external payable {
+        if (address(this).balance > 0) _transferEth(payable(msg.sender), address(this).balance);
+    }
+
     function pay(
         address token,
         address payer,
