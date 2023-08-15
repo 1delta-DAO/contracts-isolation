@@ -63,3 +63,15 @@ module.exports = [
 // npx hardhat verify --network polygon-zk-evm 0x3a69cdd907b3AfD649bb4D636E31d21A3FFF797f --contract contracts/modules/vix/data-provider/DataProvider.sol:DataProvider 
 // npx hardhat verify --network polygon-zk-evm 0xF443a1F74e9eeEa693743ed23a85279fef279187 --contract contracts/modules/vix/VixSlotFactory.sol:VixSlotFactory
 // npx hardhat verify --network polygon-zk-evm 0x3aC9681D71248018726b1767C42243101b7E92ab --contract contracts/modules/vix/lens/oVixLensZK.sol:VixLens
+
+
+// router
+
+// module.exports = [
+//     '0x4F9A0e7FD2Bf6067db6994CF12E4495Df938E6e9',
+//     '0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270',
+//     '0xdE474Db1Fa59898BC91314328D29507AcD0D593c',
+//     '0x6ec6c9c8091d160c0aa74b2b14ba9c1717e95093bd3ac085cee99a49aab294a4',
+//     '0xd3e7f58b9af034cfa7a0597e539bae7c6b393817a47a6fc1e1503cd6eaffe22a'
+//   ]
+  // npx hardhat verify --network polygon-zk-evm 0xC415733d05EB7EB4fba415c0624ae7a7A7a2c484 --contract contracts/modules/vix/aggregator/AggregationRouter.sol:AggregationRouter --constructor-args scripts/verify.js
