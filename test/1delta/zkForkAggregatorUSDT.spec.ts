@@ -97,9 +97,9 @@ it(`Test with ${DEPLOY_NEW ? 're-dployment' : 'existing deployment'}`, async fun
     )
 
     // check that the user balance is equal to the expected value
-    expect(await usdc.balanceOf(signerAddress)).to.be.eq(value,  "Invalid USDC Balance")
+    expect(await usdc.balanceOf(signerAddress)).to.be.eq(value, "Invalid USDC Balance")
 
-        // GET USDT
+    // GET USDT
     // automatically find mapping slot
     const mappingSlotUSDT = await findBalanceSlot(usdt)
     console.log("Found USDC.balanceOf slot: ", mappingSlotUSDT)
@@ -202,135 +202,20 @@ it(`Test with ${DEPLOY_NEW ? 're-dployment' : 'existing deployment'}`, async fun
         factory = await new VixSlotFactory__factory(signer).attach(SLOT_FACTORY)
     }
 
-
-    const pathIn = encodeAddress(WNATIVE_ADDRESS)
-
-    const pathMargin = encodeAggregtorPathEthers(
-        [usdcAddress, WNATIVE_ADDRESS],
-        [3000],
-        [0],
-        [0],
-        0
-    )
-
-    const params = {
-        amountDeposited: "5034471781188815",
-        minimumAmountDeposited: "0",
-        borrowAmount: "1000000",
-        minimumMarginReceived: "0",
-        swapPath: pathIn,
-        marginPath: pathMargin,
-        partner: testPartner,
-        fee: 250
-    }
-
-    console.log("Try create slot")
-    await factory.connect(signer).createSlot(params, { value: params.amountDeposited })
-    console.log("Created with ETH")
-    const tBal = await usdcContract.balanceOf(signer.address)
-
-
-    const addr = await factory.getNextAddress(signer.address)
-    console.log(addr)
-    await usdcContract.connect(signer).approve(addr, ethers.constants.MaxUint256)
-
-    const pathInUSDC = encodeAggregtorPathEthers(
-        [usdcAddress, WNATIVE_ADDRESS],
-        [3000],
-        [3],
-        [0],
-        0
-    )
-
-    const pathMarginUSDC = encodeAggregtorPathEthers(
-        [usdcAddress, WNATIVE_ADDRESS],
-        [3000],
-        [0],
-        [0],
-        0
-    )
-
-    console.log("usdc ", tBal.toString())
-    const paramsUSDC = {
-        amountDeposited: "100000",
-        minimumAmountDeposited: "0",
-        borrowAmount: "200000",
-        minimumMarginReceived: "0",
-        swapPath: pathInUSDC,
-        marginPath: pathMarginUSDC,
-        partner: testPartner,
-        fee: 200
-    }
-    console.log("Try create slot with USDC")
-    await factory.connect(signer).createSlot(paramsUSDC)
-    console.log("Created with USDC")
-
-
-    const testParamsETH = {
-        "amountDeposited": "1000000000000000",
-        "minimumAmountDeposited": "0",
-        "borrowAmount": "3506143",
-        "minimumMarginReceived": "0",
-        "swapPath": "0x4f9a0e7fd2bf6067db6994cf12e4495df938e6e9",
-        "marginPath": "0xa8ce8aee21bc2a48a5ef670afcc9274c7bbbc0350000000000c5015b9d9161dca7e18e32f6f25c4ad850731fd400000000034f9a0e7fd2bf6067db6994cf12e4495df938e6e900",
-        "partner": testPartner,
-        "fee": 50
-    }
-
-    console.log("Try create slot")
-    await factory.connect(signer).createSlot(testParamsETH, { value: testParamsETH.amountDeposited })
-    console.log("Created with ETH")
-
-
+    console.log("feth upcong slot address")
     const addrSlotWithUDST = await factory.getNextAddress(signer.address)
 
     await usdtContract.connect(signer).approve(addrSlotWithUDST, constants.MaxUint256)
 
-    const pathInUSDT = encodeAggregtorPathEthers(
-        [
-            "0x1E4a5963aBFD975d8c9021ce480b42188849D41d",
-            "0x4F9A0e7FD2Bf6067db6994CF12E4495Df938E6e9"
-        ],
-        [
-            3000
-        ],
-        [
-            3
-        ],
-        [
-            0
-        ],
-        0
-    )
-    const pathMarginUSDT = encodeAggregtorPathEthers(
-        [
-            "0xA8CE8aee21bC2A48a5EF670afCc9274C7bbbC035",
-            "0xC5015b9d9161Dca7e18e32f6f25C4aD850731Fd4",
-            "0x4F9A0e7FD2Bf6067db6994CF12E4495Df938E6e9"
-        ],
-        [
-            3000,
-            3000
-        ],
-        [
-            0,
-            3
-        ],
-        [
-            0,
-            0
-        ],
-        0
-    )
     const paramsSwapInUSDT = {
-        "amountDeposited": "2000000",
-        "minimumAmountDeposited": "0",
-        "borrowAmount": "2397376",
-        "minimumMarginReceived": "1326620184659392",
-        "swapPath": pathInUSDT,
-        "marginPath": pathMarginUSDT,
-        "fee": "50",
-        "partner": "0x7A10033Fb8F474F28C66caB7578F4aF9e6dAd37D"
+        amountDeposited: '1000000',
+        minimumAmountDeposited: '569518324875433',
+        borrowAmount: '1193313',
+        minimumMarginReceived: '680359516165615',
+        swapPath: '0x1e4a5963abfd975d8c9021ce480b42188849d41d000bb80003a8ce8aee21bc2a48a5ef670afcc9274c7bbbc035000bb800034f9a0e7fd2bf6067db6994cf12e4495df938e6e900',
+        marginPath: '0xa8ce8aee21bc2a48a5ef670afcc9274c7bbbc035000bb800004f9a0e7fd2bf6067db6994cf12e4495df938e6e900',
+        partner: '0x7A10033Fb8F474F28C66caB7578F4aF9e6dAd37D',
+        fee: '50',
     }
     console.log("Try create slot USDT")
     await factory.connect(signer).createSlot(paramsSwapInUSDT)
