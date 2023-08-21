@@ -21,9 +21,6 @@ import {InitParams, PermitParams, InitParamsWithPermit} from "../interfaces/ISlo
 contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer {
     using SafeCast for uint256;
 
-    error Slippage();
-    error AlreadyInitialized();
-
     address private immutable NATIVE_WRAPPER;
     address private immutable DATA_PROVIDER;
     uint256 private constant DEFAULT_AMOUNT_CACHED = type(uint256).max;
@@ -46,7 +43,7 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer 
      */
     function initialize(address owner, InitParams calldata params) external payable {
         address dataProvider = DATA_PROVIDER;
-        if (ds().initialized != 0) revert AlreadyInitialized();
+        require(ds().initialized == 0, "AlreadyInitialized()");
         ds().initialized = 1;
         bytes memory _bytes = params.swapPath;
         address _tokenCollateral;
@@ -69,7 +66,7 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer 
             assembly {
                 _tokenCollateral := div(mload(add(add(_bytes, 0x20), sub(bytesLength, 21))), 0x1000000000000000000000000)
             }
-            if (_deposited < params.minimumAmountDeposited) revert Slippage();
+            require(_deposited >= params.minimumAmountDeposited, "SlippageOnDeposit()");
 
             // in case we swapped to wrapped native
             if (_tokenCollateral == NATIVE_WRAPPER) {
@@ -107,7 +104,7 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer 
         // margin swap
         uint128 _received = _openPosition(borrowAmount, params.marginPath);
         ds().collateralSwapped = uint112(_received);
-        if (_received < params.minimumMarginReceived) revert Slippage();
+        require(_received >= params.minimumMarginReceived, "SlippageOnOpen()");
     }
 
     /**
@@ -115,7 +112,7 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer 
      */
     function initializeETH(address owner, InitParams calldata params) external payable {
         address dataProvider = DATA_PROVIDER;
-        if (ds().initialized != 0) revert AlreadyInitialized();
+        require(ds().initialized == 0, "AlreadyInitialized()");
         ds().initialized = 1;
 
         bytes memory _bytes = params.swapPath;
@@ -138,7 +135,7 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer 
             assembly {
                 _tokenCollateral := div(mload(add(add(_bytes, 0x20), sub(bytesLength, 21))), 0x1000000000000000000000000)
             }
-            if (_deposited < params.minimumAmountDeposited) revert Slippage();
+            require(_deposited >= params.minimumAmountDeposited, "SlippageOnDeposit()");
             collateralToken = IDataProvider(dataProvider).oToken(_tokenCollateral);
             // approve deposit token (can also be the collateral token)
             IERC20(_tokenCollateral).approve(collateralToken, type(uint256).max);
@@ -166,7 +163,7 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer 
         // margin swap
         uint128 _received = _openPosition(borrowAmount, params.marginPath);
         ds().collateralSwapped = uint112(_received);
-        if (_received < params.minimumMarginReceived) revert Slippage();
+        require(_received >= params.minimumMarginReceived, "SlippageOnOpen()");
     }
 
     /**
@@ -174,7 +171,7 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer 
      */
     function initializeWithPermit(InitParamsWithPermit calldata params) external payable {
         address dataProvider = DATA_PROVIDER;
-        if (ds().initialized != 0) revert AlreadyInitialized();
+        require(ds().initialized == 0, "AlreadyInitialized()");
         ds().initialized = 1;
 
         bytes memory _bytes = params.swapPath;
@@ -211,7 +208,7 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer 
             assembly {
                 _tokenCollateral := div(mload(add(add(_bytes, 0x20), sub(index, 21))), 0x1000000000000000000000000)
             }
-            if (_deposited < params.minimumAmountDeposited) revert Slippage();
+            require(_deposited >= params.minimumAmountDeposited, "SlippageOnDeposit()");
 
             // in case we swapped to wrapped native
             if (_tokenCollateral == NATIVE_WRAPPER) {
@@ -253,7 +250,7 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer 
         // margin swap
         uint128 _received = _openPosition(borrowAmount, params.marginPath);
         ds().collateralSwapped = uint112(_received);
-        if (_received < params.minimumMarginReceived) revert Slippage();
+        require(_received >= params.minimumMarginReceived, "SlippageOnOpen()");
     }
 
     /**
@@ -302,7 +299,7 @@ contract VixInitializeAggregator is WithVixStorage, BaseAggregator, FeeTransfer 
             // fetch amount in and clean cache
             uint256 amountIn = cs().amount;
             cs().amount = DEFAULT_AMOUNT_CACHED;
-            if (amountInMaximum < amountIn) revert Slippage();
+            require(amountInMaximum >= amountIn, "SlippageOnClose()");
         }
 
         // when everything is repaid, the amount is withdrawn to the owner

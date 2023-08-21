@@ -28,7 +28,7 @@ async function main() {
         deltaIsolationAddresses.moduleProvider
     )
 
-    console.log("moduleProvider obntained", moduleProvider.address)
+    console.log("moduleProvider obtained", moduleProvider.address)
 
 
     console.log("callback")

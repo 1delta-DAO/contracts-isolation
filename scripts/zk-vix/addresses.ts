@@ -11,6 +11,6 @@ export const deltaIsolationAddresses = {
     lens: '0x3aC9681D71248018726b1767C42243101b7E92ab',
     // modules
     callback: '0xCc0264D9235756950613C770455424f9F7294A1f',
-    initializer: '0x0e7423bDDf87AC41A768050f3956Fe81D0A01011',
+    initializer: '0x68E8cfd06c7Fe9854f669007341d3277b7A0f77d',
     direct: '0x09B2fe63BC28085C5a0e844A227c40EF441F9b4b',
 }

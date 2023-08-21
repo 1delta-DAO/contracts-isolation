@@ -180,7 +180,7 @@ const config: HardhatUserConfig = {
 
         // specify a block to fork from
         // remove if you want to fork from the last block
-        blockNumber: 4557935, // zkEVM main
+        blockNumber: 4696096 , // zkEVM main
       }
     },
     'polygon-zk-evm': {

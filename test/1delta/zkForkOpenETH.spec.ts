@@ -30,15 +30,26 @@ it("Test create slot", async function () {
         0
     )
 
+    // const params = {
+    //     amountDeposited: "5034471781188815",
+    //     minimumAmountDeposited: "0",
+    //     borrowAmount: "1000000",
+    //     minimumMarginReceived: "0",
+    //     swapPath: pathIn,
+    //     marginPath: pathMargin,
+    //     partner: partner.address,
+    //     fee: 200
+    // }
+
     const params = {
-        amountDeposited: "5034471781188815",
-        minimumAmountDeposited: "0",
-        borrowAmount: "1000000",
-        minimumMarginReceived: "0",
-        swapPath: pathIn,
-        marginPath: pathMargin,
+        amountDeposited: '1000000000000000',
+        minimumAmountDeposited: '1670791',
+        borrowAmount: '1201145470868017',
+        minimumMarginReceived: '2006863',
+        swapPath: '0x4f9a0e7fd2bf6067db6994cf12e4495df938e6e9000bb80003a8ce8aee21bc2a48a5ef670afcc9274c7bbbc03500',
+        marginPath: '0x4f9a0e7fd2bf6067db6994cf12e4495df938e6e9000bb80000a8ce8aee21bc2a48a5ef670afcc9274c7bbbc03500',
         partner: partner.address,
-        fee: 200
+        fee: '50',
     }
 
     await factory.connect(signer).createSlot(params, { value: params.amountDeposited })

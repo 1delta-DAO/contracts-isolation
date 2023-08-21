@@ -40,25 +40,25 @@
 // ];
 
 // init
-// module.exports = [
-//     '0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270',
-//     '0xdE474Db1Fa59898BC91314328D29507AcD0D593c',
-//     '0x6ec6c9c8091d160c0aa74b2b14ba9c1717e95093bd3ac085cee99a49aab294a4',
-//     '0xd3e7f58b9af034cfa7a0597e539bae7c6b393817a47a6fc1e1503cd6eaffe22a',
-//     '0x3a69cdd907b3AfD649bb4D636E31d21A3FFF797f',
-//     '0x4F9A0e7FD2Bf6067db6994CF12E4495Df938E6e9',
-//     '0xBcf269cEB210c32FA43BCb82F469667e56f01175'
-//   ]
-
-//   direct 
 module.exports = [
+    '0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270',
+    '0xdE474Db1Fa59898BC91314328D29507AcD0D593c',
+    '0x6ec6c9c8091d160c0aa74b2b14ba9c1717e95093bd3ac085cee99a49aab294a4',
+    '0xd3e7f58b9af034cfa7a0597e539bae7c6b393817a47a6fc1e1503cd6eaffe22a',
     '0x3a69cdd907b3AfD649bb4D636E31d21A3FFF797f',
     '0x4F9A0e7FD2Bf6067db6994CF12E4495Df938E6e9',
-    '0xa58d5f9397fE1C65EfE72f5fBC95C1A957418F58'
-]
+    '0xBcf269cEB210c32FA43BCb82F469667e56f01175'
+  ]
+
+//   direct 
+// module.exports = [
+//     '0x3a69cdd907b3AfD649bb4D636E31d21A3FFF797f',
+//     '0x4F9A0e7FD2Bf6067db6994CF12E4495Df938E6e9',
+//     '0xa58d5f9397fE1C65EfE72f5fBC95C1A957418F58'
+// ]
 
 
-// npx hardhat verify --network polygon-zk-evm 0x0e7423bDDf87AC41A768050f3956Fe81D0A01011 --contract contracts/modules/vix/aggregator/VixInitializeAggregator.sol:VixInitializeAggregator --constructor-args scripts/verify.js
+// npx hardhat verify --network polygon-zk-evm 0x68E8cfd06c7Fe9854f669007341d3277b7A0f77d --contract contracts/modules/vix/aggregator/VixInitializeAggregator.sol:VixInitializeAggregator --constructor-args scripts/verify.js
 // npx hardhat verify --network polygon-zk-evm 0x09B2fe63BC28085C5a0e844A227c40EF441F9b4b --contract contracts/modules/vix/VixDirect.sol:VixDirect --constructor-args scripts/verify.js
 // npx hardhat verify --network polygon-zk-evm 0x3a69cdd907b3AfD649bb4D636E31d21A3FFF797f --contract contracts/modules/vix/data-provider/DataProvider.sol:DataProvider 
 // npx hardhat verify --network polygon-zk-evm 0xF443a1F74e9eeEa693743ed23a85279fef279187 --contract contracts/modules/vix/VixSlotFactory.sol:VixSlotFactory
